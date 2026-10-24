@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="ALD_segundo_proyecto_EDII" default="jar" basedir=".">
+    <description>Entrada Ant independiente de Maven. Java 21 y fuentes compartidas.</description>
+    <target name="compile" description="Compila las fuentes Java compartidas.">
+        <ant dir="netbeans" target="compile" inheritAll="true"/>
+    </target>
+    <target name="jar" description="Genera el JAR en netbeans/dist.">
+        <ant dir="netbeans" target="jar" inheritAll="true"/>
+    </target>
+    <target name="run" description="Ejecuta la clase principal configurada.">
+        <ant dir="netbeans" target="run" inheritAll="true"/>
+    </target>
+    <target name="test" description="Ejecuta las pruebas configuradas en el proyecto Ant.">
+        <ant dir="netbeans" target="test" inheritAll="true"/>
+    </target>
+    <target name="clean" description="Limpia solamente los productos de Ant.">
+        <ant dir="netbeans" target="clean" inheritAll="true"/>
+    </target>
+</project>

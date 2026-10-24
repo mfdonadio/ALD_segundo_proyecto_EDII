@@ -1,0 +1,2 @@
+puerto=5000
+tiempoEsperaLecturaMs=10000

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="ALD_segundo_proyecto_EDII" default="jar" basedir=".">
+    <description>Java Application de NetBeans con las fuentes del proyecto Maven.</description>
+    <import file="nbproject/build-impl.xml"/>
+    <target name="-post-compile">
+        <copy todir="${build.classes.dir}">
+            <fileset dir="../src/main/resources" erroronmissingdir="false"/>
+        </copy>
+    </target>
+</project>

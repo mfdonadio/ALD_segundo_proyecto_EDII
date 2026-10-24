@@ -1,0 +1,4 @@
+host=158.158.52.35
+puerto=5000
+tiempoEsperaConexionMs=5000
+tiempoEsperaLecturaMs=10000
