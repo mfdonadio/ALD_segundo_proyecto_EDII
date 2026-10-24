@@ -16,7 +16,6 @@ public class Usuario {
     private final boolean premium;
 
     // Recibe los datos previamente validados.
-    //Constructor
     public Usuario(
             String nombre,
             String apellido,
@@ -31,7 +30,6 @@ public class Usuario {
         this.premium = premium;
     }
 
-    //Getters
     public String getNombre() {
         return nombre;
     }

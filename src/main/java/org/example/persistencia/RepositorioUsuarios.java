@@ -2,21 +2,19 @@ package org.example.persistencia;
 
 import org.example.modelo.Usuario;
 
-import java.io.IOException;
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-//Se encargara de leer ambos archivos de datos/ con la informacion de los usuarios.
-//Uniremos su informacaion usuario con la informacion de su perfil por medio del correo electronico
-
+// Lee las credenciales y los perfiles, y los relaciona por correo.
 public class RepositorioUsuarios {
 
     // Arreglo donde guardamos los usuarios cargados.
     private Usuario[] usuarios;
 
-    // Cantidad de posiciones ocupadas en el arreglo.
+    // Cantidad de posiciones ocupadas.
     private int cantidad;
 
     public RepositorioUsuarios() {
@@ -82,14 +80,12 @@ public class RepositorioUsuarios {
         return cantidad;
     }
 
-
-    //Funcion para separar los campos de informacion de los archivos txt
     private static String[] separarCampos(
             String linea,
             String archivo,
             int numeroLinea) throws IOException {
 
-        // Separa por el símbolo | y conserva los campos vacíos del final.
+        // Separa por | y conserva los campos vacíos del final.
         String[] campos = linea.split("\\|", -1);
 
         // Cada registro debe contener exactamente tres campos.
@@ -99,7 +95,7 @@ public class RepositorioUsuarios {
                             + ": se esperaban tres campos separados por '|'.");
         }
 
-        // Limpia los espacios externos y comprueba cada campo.
+        // Elimina espacios externos y comprueba cada campo.
         for (int i = 0; i < campos.length; i++) {
             campos[i] = campos[i].trim();
 
@@ -127,14 +123,13 @@ public class RepositorioUsuarios {
         }
     }
 
-    // Carga los perfiles de usuarios desde un archivo de texto.
     private static Perfil[] cargarPerfiles(Path ruta) throws IOException {
 
         // Guarda temporalmente los perfiles leídos.
         Perfil[] perfiles = new Perfil[10];
         int cantidadPerfiles = 0;
 
-        // Lee en UTF-8 para conservar tildes y otros caracteres.
+        // Lee en UTF-8 y cierra el archivo automáticamente.
         try (BufferedReader lector =
                      Files.newBufferedReader(ruta, StandardCharsets.UTF_8)) {
 
@@ -149,11 +144,12 @@ public class RepositorioUsuarios {
                     continue;
                 }
 
-                // Valida los tres campos: correo, nombre y apellido.
+                // Obtiene correo, nombre y apellido.
                 String[] campos = separarCampos(
                         linea, ruta.toString(), numeroLinea);
 
                 String correo = campos[0];
+
                 // Aplica las mismas reglas de correo a ambos archivos.
                 validarCorreo(correo, ruta, numeroLinea);
 
@@ -162,7 +158,8 @@ public class RepositorioUsuarios {
                     if (perfiles[i].correo.equalsIgnoreCase(correo)) {
                         throw new IOException(
                                 ruta + ": línea " + numeroLinea
-                                        + ": correo de perfil repetido: " + correo);
+                                        + ": correo de perfil repetido: "
+                                        + correo);
                     }
                 }
 
@@ -195,7 +192,6 @@ public class RepositorioUsuarios {
         return resultado;
     }
 
-    //Nos encargamos de, ahora si, cargar el objeto "USUARIOS"
     public static RepositorioUsuarios cargar(
             Path rutaUsuarios,
             Path rutaPerfiles) throws IOException {
@@ -292,7 +288,6 @@ public class RepositorioUsuarios {
         return repositorio;
     }
 
-    //Validamos los correo electronicos
     private static void validarCorreo(
             String correo,
             Path ruta,
