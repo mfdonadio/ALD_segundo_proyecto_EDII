@@ -1,38 +1,52 @@
 package org.example.servidor;
 
+import org.example.configuracion.ConfiguracionServidor;
+
 import java.io.IOException;
 import java.net.ServerSocket; //Nos ayuda a abrir el puerto donde recibimos las conexiones
 import java.net.Socket;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
+import java.nio.file.Path;
 
 public class ServidorMain {
 
-    public static void main(String[] args){
-        //definimos el puerto de prueba
-        int puerto = 5000;
+    public static void main(String[] args) {
 
-        //probamos la conexion del puerto
-        try(ServerSocket servidor = new ServerSocket(puerto)){
-            System.out.println("Servidor escuchando en el puerto: " + puerto);
+        //inicializamos la configuracion del servidor
+        final ConfiguracionServidor configuracion;
 
-            //Mantenemos al servidor escuchando peticiones del cliente
+        //Carga y valida los datos antes de abrir el puerto
+        try{
+            configuracion = ConfiguracionServidor.cargar(
+                    Path.of("config", "servidor.txt"));
+
+        } catch (IOException e) {
+            System.err.println(
+                    "No se puedo cargar la configuracion: " + e.getMessage());
+            return;
+        }
+
+        //Abrimos el puerto indicado en el archivo
+        try(ServerSocket servidor = new ServerSocket(configuracion.getPuerto())){
+            System.out.println("Servidor escuchando en el puerto: " + servidor.getLocalPort());
+
+            //Esperamos la conexion mientras el servidor este activo
             while(true){
                 System.out.println("Esperando conexiones...");
 
-                //Creamos el punto de conexion del cliente
+                //Esperamos hasta que se conecte un cliente
                 Socket cliente = servidor.accept();
 
-                //Utilizamos el manejador para atender al cliente
-                ManejadorCliente manejador = new ManejadorCliente(cliente);
-                //Creammos un hilo de ejecucion para atender al cliente
-                Thread hilo = new Thread(manejador);
+                //Entregamos la conexion y el tiempo maximo de lectura
+                ManejadorCliente manejador = new ManejadorCliente(cliente, configuracion.getTiempoEsperaLecturaMs());
 
-                //Iniciamos el hilo de ejecucion
+                //Atendemos al cliente, pero tambien seguimos acpetando conexiones.
+                Thread hilo = new Thread(manejador);
                 hilo.start();
             }
         } catch (IOException e) {
-            System.out.println("Error del servidor: " + e.getMessage());
+            System.err.println(
+                    "Error del servidor: " + e.getMessage());
         }
+
     }
 }

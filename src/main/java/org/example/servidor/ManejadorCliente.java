@@ -3,7 +3,6 @@ package org.example.servidor;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.net.Socket;
 
 
@@ -13,22 +12,26 @@ puede ejecutarse de manera concurrente en un hilo separado.*/
 public class ManejadorCliente implements Runnable {
 
     private final Socket cliente;
+    private final int tiempoEsperaLecturaMs;
 
-    public ManejadorCliente(Socket cliente){
+    public ManejadorCliente(Socket cliente, int tiempoEsperaLecturaMs){
         this.cliente = cliente;
+        this.tiempoEsperaLecturaMs = tiempoEsperaLecturaMs;
     }
 
     // Tarea ejecutable
     @Override
     public void run() {
         try(cliente){
-            cliente.setSoTimeout(10000);
+            cliente.setSoTimeout(tiempoEsperaLecturaMs);
 
             System.out.println("Atendiendo a: "
             + cliente.getRemoteSocketAddress());
 
-            //Enviamos la(s) entrada(s) Y recibimos la(s) salida(s)
+            //Recibe los datos del cliente
             DataInputStream entrada = new DataInputStream(cliente.getInputStream());
+
+            //Envia los datos al cliente
             DataOutputStream salida = new DataOutputStream(cliente.getOutputStream());
 
             //Preparamos el mensaje recibido
@@ -42,7 +45,7 @@ public class ManejadorCliente implements Runnable {
                 salida.writeUTF("ERROR: mensaje desconocido.");
             }
 
-            //Obligamos toda la salida y limpiamos el buffer
+            //Solicitamos enviar cualquier dato pendiente en la salida
             salida.flush();
         } catch (IOException e) {
             System.out.println("Error con el cliente "
