@@ -1,0 +1,2 @@
+marco@ejemplo.com | HASH_PENDIENTE_MARCO | true
+edwin@ejemplo.com | HASH_PENDIENTE_EDWIN | false
