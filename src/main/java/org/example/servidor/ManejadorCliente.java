@@ -4,6 +4,8 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
+import org.example.seguridad.IntercambioClaves;
+import java.math.BigInteger;
 
 
 /*Runnable nos va a permitir representar a los clientes como tareas que
@@ -33,6 +35,19 @@ public class ManejadorCliente implements Runnable {
 
             //Envia los datos al cliente
             DataOutputStream salida = new DataOutputStream(cliente.getOutputStream());
+
+            // Intercambia las claves públicas y calcula el secreto de esta conexión.
+            BigInteger secretoCompartido =
+                    IntercambioClaves.intercambiar(entrada, salida);
+
+            // Confirma que terminó el intercambio sin mostrar información secreta.
+            System.out.println("Intercambio Diffie-Hellman completado.");
+
+            // Confirma el secreto usando el papel de servidor.
+            IntercambioClaves.confirmar(
+                    entrada, salida, secretoCompartido, false);
+
+            System.out.println("Secreto compartido confirmado.");
 
             //Preparamos el mensaje recibido
             String mensaje = entrada.readUTF();

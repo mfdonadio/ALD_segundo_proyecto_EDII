@@ -7,6 +7,8 @@ import java.io.IOException;
 import java.net.Socket;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import org.example.seguridad.IntercambioClaves;
+import java.math.BigInteger;
 
 public class ClienteMain {
 
@@ -54,6 +56,19 @@ public class ClienteMain {
             // Permite recibir datos del servidor.
             DataInputStream entrada =
                     new DataInputStream(conexion.getInputStream());
+
+            // Intercambia las claves públicas y calcula el secreto de esta conexión.
+            BigInteger secretoCompartido =
+                    IntercambioClaves.intercambiar(entrada, salida);
+
+            // Confirma que terminó el intercambio sin mostrar información secreta.
+            System.out.println("Intercambio Diffie-Hellman completado.");
+
+            // Confirma el secreto usando el papel de cliente.
+            IntercambioClaves.confirmar(
+                    entrada, salida, secretoCompartido, true);
+
+            System.out.println("Secreto compartido confirmado.");
 
             // Envía un mensaje de prueba para comprobar la comunicación.
             salida.writeUTF("PING");
