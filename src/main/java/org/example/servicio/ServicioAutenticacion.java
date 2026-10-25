@@ -25,26 +25,25 @@ public class ServicioAutenticacion {
 
     public Usuario autenticar(String correo, String contrasena) {
 
-        // Rechaza datos incompletos antes de buscar la cuenta.
-        if (correo == null || correo.isBlank()
-                || contrasena == null || contrasena.isEmpty()
-                || contrasena.length() > 256) {
+        // Validamos los campos antes de consultar las cuentas.
+        if (ValidacionAcceso.validarCorreo(correo) != null
+                || ValidacionAcceso.validarContrasena(contrasena) != null) {
 
             return null;
         }
 
-        Usuario usuario = repositorio.buscarPorCorreo(correo);
+        // Quitamos espacios exteriores del correo, nunca de la contraseña.
+        Usuario usuario = repositorio.buscarPorCorreo(correo.trim());
 
-        // No existe una cuenta con ese correo.
         if (usuario == null) {
             return null;
         }
 
-        // Comprueba la contraseña contra la credencial almacenada.
+        // Comprobamos la contraseña contra la credencial almacenada.
         boolean coincide = Credenciales.verificar(
                 contrasena, usuario.getHashContrasena());
 
-        // Solo devuelve la cuenta cuando la contraseña es correcta.
+        // Devolvemos la cuenta únicamente cuando la contraseña coincide.
         return coincide ? usuario : null;
     }
 }

@@ -9,6 +9,9 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import org.example.seguridad.IntercambioClaves;
 import java.math.BigInteger;
+import org.example.seguridad.CanalCifrado;
+import org.example.seguridad.ClavesSesion;
+import java.nio.charset.StandardCharsets;
 
 public class ClienteMain {
 
@@ -70,12 +73,19 @@ public class ClienteMain {
 
             System.out.println("Secreto compartido confirmado.");
 
-            // Envía un mensaje de prueba para comprobar la comunicación.
-            salida.writeUTF("PING");
-            salida.flush();
+            // Derivamos las claves correspondientes al cliente.
+            ClavesSesion claves = ClavesSesion.crear(secretoCompartido, true);
 
-            // Espera y muestra la respuesta del servidor.
-            String respuesta = entrada.readUTF();
+            // Cada conexión conserva su propio canal y sus contadores.
+            CanalCifrado canal = new CanalCifrado(entrada, salida, claves);
+
+            // El canal cifra, autentica y envía el mensaje.
+            canal.enviar("PING".getBytes(StandardCharsets.UTF_8));
+
+            // El canal verifica y descifra antes de entregar los bytes.
+            String respuesta = new String(
+                    canal.recibir(), StandardCharsets.UTF_8);
+
             System.out.println("Respuesta del servidor: " + respuesta);
 
         } catch (IOException e) {
