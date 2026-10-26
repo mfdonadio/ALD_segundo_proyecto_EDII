@@ -12,6 +12,8 @@ import java.nio.charset.StandardCharsets;
 import org.example.servicio.ServicioAutenticacion;
 import org.example.modelo.Usuario;
 import org.example.servicio.ValidacionAcceso;
+import org.example.modelo.Libro;
+import org.example.persistencia.RepositorioLibros;
 
 
 /*Runnable nos va a permitir representar a los clientes como tareas que
@@ -25,8 +27,11 @@ public class ManejadorCliente implements Runnable {
     private final ServicioAutenticacion autenticacion;
     // Cada manejador conserva únicamente el usuario de su propia conexión.
     private Usuario usuarioAutenticado;
+    // Catálogo cargado al iniciar el servidor.
+    private final RepositorioLibros catalogo;
 
-    public ManejadorCliente(Socket cliente, int tiempoEsperaLecturaMs, ServicioAutenticacion autenticacion){
+    public ManejadorCliente(Socket cliente, int tiempoEsperaLecturaMs,
+                            ServicioAutenticacion autenticacion, RepositorioLibros catalogo){
 
         if (autenticacion == null) {
             throw new IllegalArgumentException(
@@ -36,6 +41,7 @@ public class ManejadorCliente implements Runnable {
         this.cliente = cliente;
         this.tiempoEsperaLecturaMs = tiempoEsperaLecturaMs;
         this.autenticacion = autenticacion;
+        this.catalogo = catalogo;
     }
 
     // Atiende la conexión de un cliente en su propio hilo.
@@ -177,6 +183,27 @@ public class ManejadorCliente implements Runnable {
         canal.enviar(texto.getBytes(StandardCharsets.UTF_8));
     }
 
+    //Enviamos el catalogo cuando el usuario lo solicite
+    private void enviarCatalogo(CanalCifrado canal) throws IOException {
+        // Esta operación requiere una sesión autenticada.
+        if (usuarioAutenticado == null) {
+            throw new IOException("No existe una sesión autenticada.");
+        }
+
+        enviarTexto(canal, "CATALOGO_OK");
+
+        // Indicamos cuántos registros debe recibir el cliente.
+        enviarTexto(canal, Integer.toString(catalogo.getCantidad()));
+
+        for (int i = 0; i < catalogo.getCantidad(); i++) {
+            Libro libro = catalogo.obtener(i);
+
+            // Enviamos cada campo por separado, sin separadores ambiguos.
+            enviarTexto(canal, libro.getIsbn());
+            enviarTexto(canal, libro.getTitulo());
+        }
+    }
+
     //Experiencia del usuario dentro de la sesion, por eso la "atendemos"
     private void atenderSesion(CanalCifrado canal) throws IOException {
         // Damos tiempo para elegir una opción del menú.
@@ -199,6 +226,8 @@ public class ManejadorCliente implements Runnable {
                                         ? "PREMIUM" : "NORMAL");
                     }
 
+                    case "CATALOGO" -> enviarCatalogo(canal);
+
                     case "LOGOUT" -> {
                         // Eliminamos la sesión antes de confirmar su cierre.
                         usuarioAutenticado = null;
@@ -220,4 +249,6 @@ public class ManejadorCliente implements Runnable {
             usuarioAutenticado = null;
         }
     }
+
+
 }

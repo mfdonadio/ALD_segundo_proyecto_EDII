@@ -1,0 +1,3 @@
+Archivo de prueba para la biblioteca.
+Este contenido permite verificar el cifrado y la lectura.
+Incluye caracteres como á, é, í, ó, ú, ñ y ¿qué tal?

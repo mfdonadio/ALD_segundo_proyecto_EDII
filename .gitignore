@@ -42,3 +42,6 @@ build/
 /netbeans/build/
 /netbeans/dist/
 /out/
+
+### datos que no queremos versionar ###
+/datos/claves/

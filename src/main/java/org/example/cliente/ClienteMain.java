@@ -240,6 +240,47 @@ public class ClienteMain {
         return new String(canal.recibir(), StandardCharsets.UTF_8);
     }
 
+    private static void mostrarCatalogo(CanalCifrado canal) throws IOException {
+        enviarTexto(canal, "CATALOGO");
+
+        if (!"CATALOGO_OK".equals(recibirTexto(canal))) {
+            throw new IOException(
+                    "El servidor no pudo entregar el catálogo.");
+        }
+
+        int cantidad;
+
+        try {
+            cantidad = Integer.parseInt(recibirTexto(canal));
+        } catch (NumberFormatException e) {
+            throw new IOException(
+                    "La cantidad de libros recibida no es válida.", e);
+        }
+
+        if (cantidad < 0) {
+            throw new IOException(
+                    "La cantidad de libros no puede ser negativa.");
+        }
+
+        System.out.println();
+        System.out.println("=== Catálogo de libros ===");
+
+        if (cantidad == 0) {
+            System.out.println("El catálogo está vacío.");
+            return;
+        }
+
+        for (int i = 0; i < cantidad; i++) {
+            String isbn = recibirTexto(canal);
+            String titulo = recibirTexto(canal);
+
+            System.out.println(
+                    (i + 1) + ". " + titulo + " | ISBN: " + isbn);
+        }
+
+        System.out.println("Total: " + cantidad + " libros.");
+    }
+
     //Menu con las opciones del cliente :)
     private static boolean atenderMenu(
             CanalCifrado canal,
@@ -250,7 +291,8 @@ public class ClienteMain {
             System.out.println();
             System.out.println("=== Biblioteca ===");
             System.out.println("1. Ver mi perfil");
-            System.out.println("2. Cerrar sesión");
+            System.out.println("2. Ver catálogo");
+            System.out.println("3. Cerrar sesión");
             System.out.println("0. Salir");
 
             String opcion = leerLinea(consola, teclado, "Elige una opción: ");
@@ -288,6 +330,10 @@ public class ClienteMain {
                 }
 
                 case "2" -> {
+                    mostrarCatalogo(canal);
+                }
+
+                case "3" -> {
                     enviarTexto(canal, "LOGOUT");
 
                     if (!"LOGOUT_OK".equals(recibirTexto(canal))) {
@@ -316,7 +362,7 @@ public class ClienteMain {
                 }
 
                 default -> System.out.println(
-                        "Opción inválida. Escribe 1, 2 o 0.");
+                        "Opción inválida. Escribe 1, 2, 3 o 0.");
             }
         }
     }

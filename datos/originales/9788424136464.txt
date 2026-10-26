@@ -1,0 +1,4 @@
+Segundo archivo de prueba.
+
+Esta línea aparece después de una línea vacía.
+El contenido recuperado debe conservar los mismos bytes del original.

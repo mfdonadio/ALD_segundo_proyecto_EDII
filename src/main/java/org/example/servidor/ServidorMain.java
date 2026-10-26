@@ -8,6 +8,7 @@ import java.net.Socket;
 import java.nio.file.Path;
 import org.example.persistencia.RepositorioUsuarios;
 import org.example.servicio.ServicioAutenticacion;
+import org.example.persistencia.RepositorioLibros;
 
 public class ServidorMain {
 
@@ -44,6 +45,22 @@ public class ServidorMain {
             return;
         }
 
+        // Cargamos el catálogo antes de aceptar conexiones.
+        final RepositorioLibros catalogo;
+
+        try {
+            catalogo = RepositorioLibros.cargar(
+                    Path.of("datos", "catalogo.txt"));
+
+            System.out.println("Libros disponibles en catálogo: "
+                    + catalogo.getCantidad());
+
+        } catch (IOException e) {
+            System.err.println(
+                    "No se pudo cargar el catálogo: " + e.getMessage());
+            return;
+        }
+
         //Abrimos el puerto indicado en el archivo
         try(ServerSocket servidor = new ServerSocket(configuracion.getPuerto())){
             System.out.println("Servidor escuchando en el puerto: " + servidor.getLocalPort());
@@ -59,7 +76,7 @@ public class ServidorMain {
                 ManejadorCliente manejador = new ManejadorCliente(
                         cliente,
                         configuracion.getTiempoEsperaLecturaMs(),
-                        autenticacion);
+                        autenticacion, catalogo);
 
                 //Atendemos al cliente, pero tambien seguimos acpetando conexiones.
                 Thread hilo = new Thread(manejador);
