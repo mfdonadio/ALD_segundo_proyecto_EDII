@@ -85,6 +85,11 @@ public class ManejadorCliente implements Runnable {
                 // Recibe las credenciales y comprueba el acceso.
                 atenderLogin(canal);
 
+                //Solo iniciamos la sesion se las credenciales fueron correctas.
+                if(usuarioAutenticado != null){
+                    atenderSesion(canal);
+                }
+
             } else {
                 // Rechaza los comandos que todavía no reconoce.
                 enviarTexto(canal, "ERROR_COMANDO");
@@ -170,5 +175,49 @@ public class ManejadorCliente implements Runnable {
 
         // Cada texto se envía como un mensaje protegido independiente.
         canal.enviar(texto.getBytes(StandardCharsets.UTF_8));
+    }
+
+    //Experiencia del usuario dentro de la sesion, por eso la "atendemos"
+    private void atenderSesion(CanalCifrado canal) throws IOException {
+        // Damos tiempo para elegir una opción del menú.
+        // Las operaciones de lectura siguen teniendo un límite.
+        cliente.setSoTimeout(300_000);
+
+        try {
+            while (usuarioAutenticado != null) {
+                String comando = recibirTexto(canal);
+
+                switch (comando) {
+                    case "PERFIL" -> {
+                        // Consultamos el usuario autenticado en el servidor.
+                        enviarTexto(canal, "PERFIL_OK");
+                        enviarTexto(canal, usuarioAutenticado.getNombre());
+                        enviarTexto(canal, usuarioAutenticado.getApellido());
+                        enviarTexto(canal, usuarioAutenticado.getCorreoElectronico());
+                        enviarTexto(canal,
+                                usuarioAutenticado.isPremium()
+                                        ? "PREMIUM" : "NORMAL");
+                    }
+
+                    case "LOGOUT" -> {
+                        // Eliminamos la sesión antes de confirmar su cierre.
+                        usuarioAutenticado = null;
+                        enviarTexto(canal, "LOGOUT_OK");
+                        return;
+                    }
+
+                    case "SALIR" -> {
+                        usuarioAutenticado = null;
+                        enviarTexto(canal, "SALIR_OK");
+                        return;
+                    }
+
+                    default -> enviarTexto(canal, "ERROR_COMANDO");
+                }
+            }
+        } finally {
+            // También limpiamos la sesión si hay una desconexión o un error.
+            usuarioAutenticado = null;
+        }
     }
 }
