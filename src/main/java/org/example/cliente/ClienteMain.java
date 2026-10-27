@@ -19,31 +19,83 @@ import java.nio.file.Path;
 import org.example.seguridad.Sha256;
 import java.nio.file.Files;
 import org.example.servicio.ServicioLibros;
-import java.nio.file.StandardOpenOption;
 import org.example.compresion.Huffman;
+
+
 
 public class ClienteMain {
 
     public static void main(String[] args) {
+        Console consola = System.console();
+
+        // Compartimos el mismo lector durante toda la ejecución.
+        BufferedReader teclado = new BufferedReader(
+                new InputStreamReader(System.in, StandardCharsets.UTF_8));
+
+        try {
+            while (true) {
+                System.out.println();
+                System.out.println("=== BIBLIOTECA ===");
+                System.out.println("1. Iniciar sesión");
+                System.out.println("2. Leer archivo Huffman local");
+                System.out.println("0. Salir");
+
+                String opcion = leerLinea(
+                        consola, teclado, "Elige una opción: ");
+
+                if (opcion == null) {
+                    return;
+                }
+
+                switch (opcion.trim()) {
+                    case "1" -> {
+                        // Solo esta opción necesita conectarse al servidor.
+                        boolean finalizar = iniciarSesion(consola, teclado);
+
+                        if (finalizar) {
+                            return;
+                        }
+                    }
+
+                    case "2" -> {
+                        // Lee el archivo local sin abrir ningún socket.
+                        leerHuffmanLocal(consola, teclado);
+                    }
+
+                    case "0" -> {
+                        System.out.println("¡Hasta luego!");
+                        return;
+                    }
+
+                    default -> System.out.println(
+                            "Opción inválida. Escribe 1, 2 o 0.");
+                }
+            }
+
+        } catch (IOException e) {
+            System.err.println(
+                    "No se pudo leer la entrada de consola: " + e.getMessage());
+        }
+    }
+
+    private static boolean iniciarSesion(
+            Console consola,
+            BufferedReader teclado) throws IOException {
 
         final ConfiguracionCliente configuracion;
 
         try {
-            // Cargamos la configuración antes de pedir las credenciales.
+            // La configuración de red solo se carga para iniciar sesión.
             configuracion = ConfiguracionCliente.cargar(
                     Path.of("config", "cliente.txt"));
 
         } catch (IOException e) {
-            System.err.println(
+            System.out.println(
                     "No se pudo cargar la configuración: " + e.getMessage());
-            return;
+
+            // Permitimos regresar al menú y utilizar la lectura local.
+            return false;
         }
-
-        Console consola = System.console();
-
-        // IntelliJ normalmente no proporciona un objeto Console.
-        BufferedReader teclado = new BufferedReader(
-                new InputStreamReader(System.in, StandardCharsets.UTF_8));
 
         if (consola == null) {
             System.out.println(
@@ -52,66 +104,71 @@ public class ClienteMain {
 
         String correo = "";
 
-        try {
-            while (true) {
-                // Permitimos conservar el correo del intento anterior.
-                String indicacion = correo.isEmpty()
-                        ? "Correo: "
-                        : "Correo [" + correo + "] (Enter para conservar): ";
+        while (true) {
+            String indicacion = correo.isEmpty()
+                    ? "Correo: "
+                    : "Correo [" + correo + "] (Enter para conservar): ";
 
-                String escrito = leerLinea(consola, teclado, indicacion);
+            String escrito = leerLinea(consola, teclado, indicacion);
 
-                // Enter conserva el último correo válido.
-                String candidato = escrito.isEmpty() ? correo : escrito.trim();
-
-                String errorCorreo = ValidacionAcceso.validarCorreo(candidato);
-
-                if (errorCorreo != null) {
-                    System.out.println(errorCorreo);
-                    continue;
-                }
-
-                // Actualizamos el correo guardado solo cuando el formato es válido.
-                correo = candidato;
-
-                String contrasena;
-
-                // Si la contraseña tiene un error de formato, repetimos solo ese campo.
-                while (true) {
-                    contrasena = leerContrasena(consola, teclado);
-
-                    if (contrasena == null) {
-                        return;
-                    }
-
-                    String error = ValidacionAcceso.validarContrasena(contrasena);
-
-                    if (error == null) {
-                        break;
-                    }
-
-                    System.out.println(error);
-                }
-
-                // Abrimos una conexión nueva por cada intento de autenticación.
-                boolean finalizar = intentarAcceso(
-                        configuracion, correo, contrasena, consola, teclado);
-
-                if (finalizar) {
-                    return;
-                }
-
-                String repetir = leerLinea(
-                        consola, teclado, "¿Quieres volver al inicio de sesión? (s/n): ");
-
-                if (repetir == null || !"s".equalsIgnoreCase(repetir.trim())) {
-                    return;
-                }
+            if (escrito == null) {
+                return true;
             }
 
-        } catch (IOException e) {
-            System.err.println(
-                    "No se pudo leer la entrada de consola: " + e.getMessage());
+            // Conservamos únicamente el último correo con formato válido.
+            String candidato = escrito.isEmpty()
+                    ? correo
+                    : escrito.trim();
+
+            String errorCorreo = ValidacionAcceso.validarCorreo(candidato);
+
+            if (errorCorreo != null) {
+                System.out.println(errorCorreo);
+                continue;
+            }
+
+            correo = candidato;
+
+            String contrasena;
+
+            while (true) {
+                contrasena = leerContrasena(consola, teclado);
+
+                if (contrasena == null) {
+                    return true;
+                }
+
+                String error =
+                        ValidacionAcceso.validarContrasena(contrasena);
+
+                if (error == null) {
+                    break;
+                }
+
+                System.out.println(error);
+            }
+
+            // Conservamos el flujo de conexión y menú que ya tenemos.
+            boolean finalizar = intentarAcceso(
+                    configuracion, correo, contrasena, consola, teclado);
+
+            if (finalizar) {
+                return true;
+            }
+
+            String repetir = leerLinea(
+                    consola,
+                    teclado,
+                    "¿Quieres volver al inicio de sesión? (s/n): ");
+
+            if (repetir == null) {
+                return true;
+            }
+
+            if (!"s".equalsIgnoreCase(repetir.trim())) {
+                // Volvemos al menú inicial, donde sigue disponible la lectura local.
+                return false;
+            }
         }
     }
 
@@ -372,7 +429,7 @@ public class ClienteMain {
                 }
 
                 default -> System.out.println(
-                        "Opción inválida. Escribe 1, 2, 3, 4 o 0.");
+                        "Opción inválida. Escribe 1, 2, 3, 4, 5 o 0.");
             }
         }
     }
@@ -479,16 +536,10 @@ public class ClienteMain {
         }
 
         Path carpeta = Path.of("descargas");
-        Files.createDirectories(carpeta);
+
 
         Path destino = carpeta.resolve(isbn + ".txt");
 
-        // No reemplazamos una descarga existente.
-        if (Files.exists(destino)) {
-            System.out.println(
-                    "El archivo ya existe en: " + destino.toAbsolutePath());
-            return;
-        }
 
         enviarTexto(canal, "DESCARGAR");
         enviarTexto(canal, isbn);
@@ -536,7 +587,7 @@ public class ClienteMain {
                     "Las claves recibidas tienen un tamaño inválido.");
         }
 
-        //Creamos el archivo vacío.
+        // Reservamos espacio para recibir todos los bytes del archivo.
         byte[] archivo = new byte[longitud];
         int recibidos = 0;
 
@@ -564,64 +615,165 @@ public class ClienteMain {
                     "La descarga no coincide con el archivo enviado.");
         }
 
-        // Guardamos primero en un archivo temporal.
-        Path temporal = Files.createTempFile(carpeta, "libro-", ".part");
-
+        // La descarga ya terminó. Un error local no debe cerrar la sesión.
         try {
-            Files.write(temporal, archivo);
+            // Guardamos el cifrado o verificamos que el existente sea idéntico.
+            guardarArchivoVerificado(destino, archivo);
 
-            // Comprobamos también los bytes que quedaron escritos en disco.
-            byte[] guardado = Files.readAllBytes(temporal);
+            System.out.println("Descarga cifrada verificada: "
+                    + destino.toAbsolutePath());
 
-            if (guardado.length != archivo.length) {
-                throw new IOException("El archivo guardado está incompleto.");
+            // Desciframos sin modificar el archivo cifrado que acabamos de guardar.
+            byte[] original = ServicioLibros.descifrarArchivo(
+                    archivo, claveLibro, claveHmacLibro);
+
+            // Comprimimos los bytes originales del libro.
+            byte[] comprimido = Huffman.comprimir(original);
+
+            // Comprobamos que la compresión permita recuperar el contenido exacto.
+            byte[] recuperado = Huffman.descomprimir(comprimido);
+
+            if (original.length != recuperado.length) {
+                throw new IOException(
+                        "Huffman no recuperó la longitud original.");
             }
 
-            for (int i = 0; i < archivo.length; i++) {
-                if (guardado[i] != archivo[i]) {
+            for (int i = 0; i < original.length; i++) {
+                if (original[i] != recuperado[i]) {
                     throw new IOException(
-                            "El archivo guardado difiere en el byte " + i + ".");
+                            "Huffman no recuperó correctamente el byte " + i + ".");
                 }
             }
 
-            // Sin REPLACE_EXISTING: no sobrescribimos otro archivo.
-            Files.move(temporal, destino);
+            Path destinoHuffman = carpeta.resolve(isbn + ".huff");
 
-        } finally {
-            // Retiramos el temporal si la escritura o el movimiento fallaron.
-            Files.deleteIfExists(temporal);
-        }
+            // Guardamos los bytes comprimidos o verificamos el archivo existente.
+            guardarArchivoVerificado(destinoHuffman, comprimido);
 
-        System.out.println("Descarga verificada correctamente.");
-        System.out.println("Bytes recibidos: " + archivo.length);
-        System.out.println("Archivo: " + destino.toAbsolutePath());
-
-
-        // Desciframos sin modificar el archivo cifrado que acabamos de guardar.
-        byte[] original = ServicioLibros.descifrarArchivo(
-                archivo, claveLibro, claveHmacLibro);
-
-        Path destinoOriginal = carpeta.resolve(isbn + ".descifrado.txt");
-
-        if (Files.exists(destinoOriginal)) {
+            System.out.println("Libro comprimido y verificado correctamente.");
+            System.out.println("Original: " + original.length + " bytes.");
+            System.out.println("Huffman: " + comprimido.length + " bytes.");
             System.out.println(
-                    "El libro se descifró, pero ya existe: "
-                            + destinoOriginal.toAbsolutePath());
+                    "Archivo guardado en: " + destinoHuffman.toAbsolutePath());
+
+        } catch (IOException e) {
+            // Volvemos al menú sin confundir un fallo local con uno de conexión.
+            System.out.println(
+                    "No se pudo completar el procesamiento local del libro: "
+                            + e.getMessage());
+        }
+    }
+    //Leemos un archivo comprimido con Huffman desde un archivo comprimido, sin necesidad de abrir el server.
+    /*
+     * Abre un archivo Huffman local y muestra su contenido.
+     * No necesita una conexión con el servidor.
+     * Un archivo inválido muestra un error y permite volver al menú.
+     */
+    private static void leerHuffmanLocal(
+            Console consola,
+            BufferedReader teclado) throws IOException {
+
+        String rutaEscrita = leerLinea(
+                consola,
+                teclado,
+                "Ruta del archivo .huff (Enter para cancelar): ");
+
+        if (rutaEscrita == null || rutaEscrita.isBlank()) {
             return;
         }
 
-            // Guardamos los bytes directamente para conservar el contenido exacto.
-        Files.write(
-                destinoOriginal,
-                original,
-                StandardOpenOption.CREATE_NEW,
-                StandardOpenOption.WRITE);
+        try {
+            Path ruta = Path.of(rutaEscrita.trim());
 
-        System.out.println("Libro descifrado correctamente.");
-        System.out.println("Bytes recuperados: " + original.length);
-        System.out.println(
-                "Contenido guardado en: " + destinoOriginal.toAbsolutePath());
+            // Cubre los archivos generados con nuestro límite de 1 MiB original.
+            int maximoArchivo = 2 * 1024 * 1024;
+
+            byte[] comprimido;
+
+            // Leemos un byte adicional para detectar archivos demasiado grandes.
+            try (var entrada = Files.newInputStream(ruta)) {
+                comprimido = entrada.readNBytes(maximoArchivo + 1);
+            }
+
+            if (comprimido.length > maximoArchivo) {
+                System.out.println(
+                        "El archivo supera el tamaño admitido.");
+                return;
+            }
+
+            // Huffman valida el formato antes de devolver los bytes recuperados.
+            byte[] original = Huffman.descomprimir(comprimido);
+
+            // Nuestros libros de texto están preparados en UTF-8.
+            String texto = new String(original, StandardCharsets.UTF_8);
+
+            System.out.println();
+            System.out.println("=== LECTURA DEL ARCHIVO HUFFMAN ===");
+            System.out.print(texto);
+            System.out.println();
+            System.out.println("=== FIN DEL LIBRO ===");
+
+        } catch (IOException | IllegalArgumentException e) {
+            // El error se atiende aquí para conservar el funcionamiento del menú.
+            System.out.println(
+                    "No se pudo abrir el archivo Huffman: " + e.getMessage());
+        }
+    }
+
+    /*
+     * Conserva un archivo existente si coincide exactamente con los datos.
+     * Si no existe, lo escribe primero en un temporal.
+     * Nunca sobrescribe un archivo diferente.
+     */
+    private static void guardarArchivoVerificado(
+            Path destino, byte[] datos) throws IOException {
+
+        if (Files.exists(destino)) {
+            comprobarArchivo(destino, datos);
+
+            System.out.println(
+                    "Archivo existente verificado: " + destino.toAbsolutePath());
+            return;
+        }
+
+        Path carpeta = destino.toAbsolutePath().getParent();
+        Files.createDirectories(carpeta);
 
 
+        Path temporal = Files.createTempFile(carpeta, "biblioteca-", ".part");
+
+        try {
+            Files.write(temporal, datos);
+            comprobarArchivo(temporal, datos);
+
+            // Si otro archivo aparece en el destino, no lo reemplazamos.
+            Files.move(temporal, destino);
+
+        } finally {
+            Files.deleteIfExists(temporal);
+        }
+    }
+
+    private static void comprobarArchivo(
+            Path ruta, byte[] esperado) throws IOException {
+
+        byte[] guardado;
+
+        // Leemos un byte adicional para detectar una longitud mayor.
+        try (var entrada = Files.newInputStream(ruta)) {
+            guardado = entrada.readNBytes(esperado.length + 1);
+        }
+
+        if (guardado.length != esperado.length) {
+            throw new IOException(
+                    "El archivo existente tiene contenido diferente: " + ruta);
+        }
+
+        for (int i = 0; i < esperado.length; i++) {
+            if (guardado[i] != esperado[i]) {
+                throw new IOException(
+                        "El archivo difiere en el byte " + i + ": " + ruta);
+            }
+        }
     }
 }

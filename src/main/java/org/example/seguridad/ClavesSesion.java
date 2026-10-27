@@ -5,7 +5,7 @@ import java.nio.charset.StandardCharsets;
 
 /*
  * Deriva las claves de una conexión desde el secreto de Diffie-Hellman.
- * Separa las claves de cifrado y HMAC para cada dirección.
+ * Separa las claves de cifrado y HMAC para cada dirección. 8========D
  * Asigna las claves de envío y recepción según el participante.
  * Devuelve copias para evitar modificaciones de las claves almacenadas.
  */
