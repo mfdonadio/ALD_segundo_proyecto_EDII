@@ -85,7 +85,7 @@ public class PruebaClavesSesion {
             ClavesSesion receptor,
             String descripcion) {
 
-        byte[] original = texto.getBytes(StandardCharsets.UTF_8);
+    byte[] original = texto.getBytes(StandardCharsets.UTF_8);
 
         // El emisor utiliza exclusivamente sus claves de envío.
         byte[] paquete = MensajeCifrado.cifrar(

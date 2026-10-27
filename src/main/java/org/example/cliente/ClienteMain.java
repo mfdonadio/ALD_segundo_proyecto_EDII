@@ -683,7 +683,17 @@ public class ClienteMain {
         }
 
         try {
-            Path ruta = Path.of(rutaEscrita.trim());
+            // Quitamos espacios alrededor de la ruta.
+            String rutaLimpia = rutaEscrita.trim();
+
+            // Windows puede copiar la ruta entre comillas.
+            if (rutaLimpia.length() >= 2
+                    && rutaLimpia.startsWith("\"")
+                    && rutaLimpia.endsWith("\"")) {
+                rutaLimpia = rutaLimpia.substring(1, rutaLimpia.length() - 1);
+            }
+
+            Path ruta = Path.of(rutaLimpia);
 
             // Cubre los archivos generados con nuestro límite de 1 MiB original.
             int maximoArchivo = 2 * 1024 * 1024;
