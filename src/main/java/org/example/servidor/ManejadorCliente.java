@@ -18,6 +18,7 @@ import org.example.servicio.ServicioLibros;
 import org.example.seguridad.Sha256;
 
 
+
 /*Runnable nos va a permitir representar a los clientes como tareas que
 puede ejecutarse de manera concurrente en un hilo separado.*/
 
@@ -338,6 +339,11 @@ public class ManejadorCliente implements Runnable {
         enviarTexto(canal, "DESCARGA_OK");
         enviarTexto(canal, Integer.toString(archivo.length));
         enviarTexto(canal, hash);
+
+        // Esta sección solo se alcanza después de autorizar la descarga premium.
+        // Las claves viajan protegidas por las claves de sesión del canal.
+        canal.enviar(servicioLibros.obtenerClaveCifrado());
+        canal.enviar(servicioLibros.obtenerClaveHmac());
 
         int posicion = 0;
 

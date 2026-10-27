@@ -18,6 +18,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import org.example.seguridad.Sha256;
 import java.nio.file.Files;
+import org.example.servicio.ServicioLibros;
+import java.nio.file.StandardOpenOption;
+import org.example.compresion.Huffman;
 
 public class ClienteMain {
 
@@ -468,6 +471,7 @@ public class ClienteMain {
 
         isbn = isbn.trim();
 
+        //Usamos una regex para validar el formato del ISBN de nuestros libros.
         if (!isbn.matches("[0-9Xx-]+")) {
             System.out.println(
                     "El ISBN solo puede contener números, guiones o X.");
@@ -518,10 +522,21 @@ public class ClienteMain {
 
         String hashEsperado = recibirTexto(canal);
 
+        //Otra regex, para validar el formato del hash.
         if (!hashEsperado.matches("[0-9a-f]{64}")) {
             throw new IOException("El hash recibido tiene un formato inválido.");
         }
 
+        // Recibimos las claves de libros mediante el canal cifrado.
+        byte[] claveLibro = canal.recibir();
+        byte[] claveHmacLibro = canal.recibir();
+
+        if (claveLibro.length != 24 || claveHmacLibro.length != 32) {
+            throw new IOException(
+                    "Las claves recibidas tienen un tamaño inválido.");
+        }
+
+        //Creamos el archivo vacío.
         byte[] archivo = new byte[longitud];
         int recibidos = 0;
 
@@ -580,5 +595,33 @@ public class ClienteMain {
         System.out.println("Descarga verificada correctamente.");
         System.out.println("Bytes recibidos: " + archivo.length);
         System.out.println("Archivo: " + destino.toAbsolutePath());
+
+
+        // Desciframos sin modificar el archivo cifrado que acabamos de guardar.
+        byte[] original = ServicioLibros.descifrarArchivo(
+                archivo, claveLibro, claveHmacLibro);
+
+        Path destinoOriginal = carpeta.resolve(isbn + ".descifrado.txt");
+
+        if (Files.exists(destinoOriginal)) {
+            System.out.println(
+                    "El libro se descifró, pero ya existe: "
+                            + destinoOriginal.toAbsolutePath());
+            return;
+        }
+
+            // Guardamos los bytes directamente para conservar el contenido exacto.
+        Files.write(
+                destinoOriginal,
+                original,
+                StandardOpenOption.CREATE_NEW,
+                StandardOpenOption.WRITE);
+
+        System.out.println("Libro descifrado correctamente.");
+        System.out.println("Bytes recuperados: " + original.length);
+        System.out.println(
+                "Contenido guardado en: " + destinoOriginal.toAbsolutePath());
+
+
     }
 }

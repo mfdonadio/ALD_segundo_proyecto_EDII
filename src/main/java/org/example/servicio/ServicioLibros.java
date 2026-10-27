@@ -48,27 +48,31 @@ public final class ServicioLibros {
 
     //Accedemos al contenido del libro.
     public byte[] leerContenido(String isbn) throws IOException {
-        Path ruta = localizar(isbn);
+        // Recuperamos el archivo almacenado sin modificar sus bytes.
+        byte[] archivo = leerArchivoCifrado(isbn);
 
-        byte[] archivo;
+        return descifrarArchivo(
+                archivo, claves.getCifrado(), claves.getHmac());
+    }
 
-        // Leemos un byte adicional para detectar archivos demasiado grandes.
-        try (var entrada = Files.newInputStream(ruta)) {
-            archivo = entrada.readNBytes(MAXIMO_ARCHIVO + 1);
-        }
+    /* Recupera el original desde los bytes de un archivo cifrado.
+     * También puede utilizarse en el cliente sin crear un ServicioLibros. */
+    public static byte[] descifrarArchivo(
+            byte[] archivo,
+            byte[] claveCifrado,
+            byte[] claveHmac) throws IOException {
 
-        if (archivo.length > MAXIMO_ARCHIVO) {
+        if (archivo == null || archivo.length > MAXIMO_ARCHIVO) {
             throw new IOException(
-                    "El archivo del libro supera el tamaño permitido.");
+                    "El archivo del libro supera el tamaño permitido o es nulo.");
         }
 
         String texto = new String(archivo, StandardCharsets.UTF_8);
 
-        // Adaptamos los saltos del contenedor, no los del contenido original.
+        // Normalizamos únicamente el contenedor, no el contenido del libro.
         String normalizado = texto.replace("\r\n", "\n");
         String[] lineas = normalizado.split("\n", -1);
 
-        // Admitimos la cabecera y el hexadecimal, con o sin salto final.
         boolean estructuraValida =
                 lineas.length == 2
                         || (lineas.length == 3 && lineas[2].isEmpty());
@@ -81,11 +85,9 @@ public final class ServicioLibros {
         byte[] paquete = desdeHexadecimal(lineas[1]);
 
         try {
-            // MensajeCifrado verifica el HMAC antes de descifrar.
+            // El HMAC se verifica antes del descifrado.
             return MensajeCifrado.descifrar(
-                    paquete,
-                    claves.getCifrado(),
-                    claves.getHmac());
+                    paquete, claveCifrado, claveHmac);
 
         } catch (IllegalArgumentException e) {
             throw new IOException(
@@ -183,5 +185,15 @@ public final class ServicioLibros {
         }
 
         return archivo;
+    }
+
+    //Para poder cifrar la información del libro solicitado, necesitamos la clave pública.
+    public byte[] obtenerClaveCifrado() {
+        // ClavesLibros devuelve una copia del arreglo.
+        return claves.getCifrado();
+    }
+
+    public byte[] obtenerClaveHmac() {
+        return claves.getHmac();
     }
 }

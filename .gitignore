@@ -45,3 +45,4 @@ build/
 
 ### datos que no queremos versionar ###
 /datos/claves/
+/descargas/
