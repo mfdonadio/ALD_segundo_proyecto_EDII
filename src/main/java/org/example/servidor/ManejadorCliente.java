@@ -14,6 +14,8 @@ import org.example.modelo.Usuario;
 import org.example.servicio.ValidacionAcceso;
 import org.example.modelo.Libro;
 import org.example.persistencia.RepositorioLibros;
+import org.example.servicio.ServicioLibros;
+import org.example.seguridad.Sha256;
 
 
 /*Runnable nos va a permitir representar a los clientes como tareas que
@@ -29,11 +31,15 @@ public class ManejadorCliente implements Runnable {
     private Usuario usuarioAutenticado;
     // Catálogo cargado al iniciar el servidor.
     private final RepositorioLibros catalogo;
+    // Recupera el contenido de los libros almacenados.
+    private final ServicioLibros servicioLibros;
 
     public ManejadorCliente(Socket cliente, int tiempoEsperaLecturaMs,
-                            ServicioAutenticacion autenticacion, RepositorioLibros catalogo){
+                            ServicioAutenticacion autenticacion,
+                            RepositorioLibros catalogo,
+                            ServicioLibros servicioLibros){
 
-        if (autenticacion == null) {
+        if (autenticacion == null || catalogo == null || servicioLibros == null) {
             throw new IllegalArgumentException(
                     "El servicio de autenticación es obligatorio.");
         }
@@ -42,6 +48,7 @@ public class ManejadorCliente implements Runnable {
         this.tiempoEsperaLecturaMs = tiempoEsperaLecturaMs;
         this.autenticacion = autenticacion;
         this.catalogo = catalogo;
+        this.servicioLibros = servicioLibros;
     }
 
     // Atiende la conexión de un cliente en su propio hilo.
@@ -228,6 +235,10 @@ public class ManejadorCliente implements Runnable {
 
                     case "CATALOGO" -> enviarCatalogo(canal);
 
+                    case "LEER" -> enviarLectura(canal);
+
+                    case "DESCARGAR" -> enviarDescarga(canal);
+
                     case "LOGOUT" -> {
                         // Eliminamos la sesión antes de confirmar su cierre.
                         usuarioAutenticado = null;
@@ -250,5 +261,95 @@ public class ManejadorCliente implements Runnable {
         }
     }
 
+    //Cuando el usuario solicita leer un libro.
+    private void enviarLectura(CanalCifrado canal) throws IOException {
+        if (usuarioAutenticado == null) {
+            throw new IOException("No existe una sesión autenticada.");
+        }
+
+        // Recibimos el ISBN después del comando LEER.
+        String isbn = recibirTexto(canal);
+        byte[] contenido;
+
+        try {
+            // Completamos la lectura y verificación antes de anunciar éxito.
+            contenido = servicioLibros.leerContenido(isbn);
+
+        } catch (IOException e) {
+            System.err.println("No se pudo leer un libro: " + e.getMessage());
+
+            enviarTexto(canal, "LECTURA_ERROR");
+            enviarTexto(canal,
+                    "No se pudo abrir el libro. Revisa el ISBN y su disponibilidad.");
+            return;
+        }
+
+        enviarTexto(canal, "LECTURA_OK");
+        enviarTexto(canal, Integer.toString(contenido.length));
+
+        // Cada parte viaja como un mensaje cifrado y autenticado.
+        int posicion = 0;
+
+        while (posicion < contenido.length) {
+            int cantidad = Math.min(32 * 1024, contenido.length - posicion);
+            byte[] parte = new byte[cantidad];
+
+            System.arraycopy(contenido, posicion, parte, 0, cantidad);
+            canal.enviar(parte);
+
+            posicion += cantidad;
+        }
+    }
+
+    //Los usuarios premium pueden descargar libros cifrados.
+    private void enviarDescarga(CanalCifrado canal) throws IOException {
+        if (usuarioAutenticado == null) {
+            throw new IOException("No existe una sesión autenticada.");
+        }
+
+        // Consumimos el ISBN para mantener el orden del protocolo.
+        String isbn = recibirTexto(canal);
+
+        // El permiso se comprueba en el servidor, no solo en el menú.
+        if (!usuarioAutenticado.isPremium()) {
+            enviarTexto(canal, "DESCARGA_DENEGADA");
+            enviarTexto(canal,
+                    "La descarga está disponible únicamente para cuentas premium.");
+            return;
+        }
+
+        byte[] archivo;
+
+        try {
+            archivo = servicioLibros.leerArchivoCifrado(isbn);
+
+        } catch (IOException e) {
+            System.err.println("Error al preparar la descarga: " + e.getMessage());
+
+            enviarTexto(canal, "DESCARGA_ERROR");
+            enviarTexto(canal,
+                    "No se pudo descargar el libro. Revisa el ISBN y su disponibilidad.");
+            return;
+        }
+
+        // Calculamos el hash sobre los bytes exactos que vamos a enviar.
+        String hash = Sha256.aHexadecimal(Sha256.calcular(archivo));
+
+        enviarTexto(canal, "DESCARGA_OK");
+        enviarTexto(canal, Integer.toString(archivo.length));
+        enviarTexto(canal, hash);
+
+        int posicion = 0;
+
+        while (posicion < archivo.length) {
+            int cantidad = Math.min(32 * 1024, archivo.length - posicion);
+            byte[] parte = new byte[cantidad];
+
+            System.arraycopy(archivo, posicion, parte, 0, cantidad);
+            canal.enviar(parte);
+
+            posicion += cantidad;
+        }
+    }
 
 }

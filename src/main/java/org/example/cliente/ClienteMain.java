@@ -5,7 +5,6 @@ import org.example.seguridad.CanalCifrado;
 import org.example.seguridad.ClavesSesion;
 import org.example.seguridad.IntercambioClaves;
 import org.example.servicio.ValidacionAcceso;
-
 import java.io.BufferedReader;
 import java.io.Console;
 import java.io.DataInputStream;
@@ -17,6 +16,8 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import org.example.seguridad.Sha256;
+import java.nio.file.Files;
 
 public class ClienteMain {
 
@@ -292,7 +293,9 @@ public class ClienteMain {
             System.out.println("=== Biblioteca ===");
             System.out.println("1. Ver mi perfil");
             System.out.println("2. Ver catálogo");
-            System.out.println("3. Cerrar sesión");
+            System.out.println("3. Leer libro");
+            System.out.println("4. Descargar libro cifrado (Premium)");
+            System.out.println("5. Cerrar sesión");
             System.out.println("0. Salir");
 
             String opcion = leerLinea(consola, teclado, "Elige una opción: ");
@@ -333,7 +336,11 @@ public class ClienteMain {
                     mostrarCatalogo(canal);
                 }
 
-                case "3" -> {
+                case "3" -> leerLibro(canal, consola, teclado);
+
+                case "4" -> descargarLibro(canal, consola, teclado);
+
+                case "5" -> {
                     enviarTexto(canal, "LOGOUT");
 
                     if (!"LOGOUT_OK".equals(recibirTexto(canal))) {
@@ -362,8 +369,216 @@ public class ClienteMain {
                 }
 
                 default -> System.out.println(
-                        "Opción inválida. Escribe 1, 2, 3 o 0.");
+                        "Opción inválida. Escribe 1, 2, 3, 4 o 0.");
             }
         }
+    }
+
+    //Leer el libro desde terminal.
+    private static void leerLibro(
+            CanalCifrado canal,
+            Console consola,
+            BufferedReader teclado) throws IOException {
+
+        // Pedimos el ISBN antes de iniciar la petición al servidor.
+        String isbn = leerLinea(
+                consola, teclado, "ISBN del libro (Enter para cancelar): ");
+
+        if (isbn == null || isbn.isBlank()) {
+            return;
+        }
+
+        isbn = isbn.trim();
+
+        if (!isbn.matches("[0-9Xx-]+")) {
+            System.out.println(
+                    "El ISBN solo puede contener números, guiones o X.");
+            return;
+        }
+
+        enviarTexto(canal, "LEER");
+        enviarTexto(canal, isbn);
+
+        String estado = recibirTexto(canal);
+
+        if ("LECTURA_ERROR".equals(estado)) {
+            System.out.println(recibirTexto(canal));
+            return;
+        }
+
+        if (!"LECTURA_OK".equals(estado)) {
+            throw new IOException("Respuesta de lectura no reconocida.");
+        }
+
+        int longitud;
+
+        try {
+            longitud = Integer.parseInt(recibirTexto(canal));
+        } catch (NumberFormatException e) {
+            throw new IOException("Longitud del libro inválida.", e);
+        }
+
+        // Coincide con el límite actual de los originales importados.
+        if (longitud < 0 || longitud > 1024 * 1024) {
+            throw new IOException("El tamaño del libro no está permitido.");
+        }
+
+        byte[] contenido = new byte[longitud];
+        int recibidos = 0;
+
+        while (recibidos < longitud) {
+            byte[] parte = canal.recibir();
+
+            // Validamos cada parte antes de copiarla.
+            if (parte.length == 0
+                    || parte.length > 32 * 1024
+                    || parte.length > longitud - recibidos) {
+
+                throw new IOException("Parte del libro inválida.");
+            }
+
+            System.arraycopy(
+                    parte, 0, contenido, recibidos, parte.length);
+
+            recibidos += parte.length;
+        }
+
+        // Convertimos después de reunir todos los bytes para no cortar acentos.
+        String texto = new String(contenido, StandardCharsets.UTF_8);
+
+        System.out.println();
+        System.out.println("=== LECTURA DEL LIBRO DESDE TERMINAL ===\n");
+        System.out.print(texto);
+        System.out.println();
+        System.out.println("\n=== FIN DEL LIBRO ===");
+    }
+
+    //Descargar el libro seleccionado, para usuarios premium.
+    private static void descargarLibro(
+            CanalCifrado canal,
+            Console consola,
+            BufferedReader teclado) throws IOException {
+
+        String isbn = leerLinea(
+                consola, teclado, "ISBN para descargar (Enter para cancelar): ");
+
+        if (isbn == null || isbn.isBlank()) {
+            return;
+        }
+
+        isbn = isbn.trim();
+
+        if (!isbn.matches("[0-9Xx-]+")) {
+            System.out.println(
+                    "El ISBN solo puede contener números, guiones o X.");
+            return;
+        }
+
+        Path carpeta = Path.of("descargas");
+        Files.createDirectories(carpeta);
+
+        Path destino = carpeta.resolve(isbn + ".txt");
+
+        // No reemplazamos una descarga existente.
+        if (Files.exists(destino)) {
+            System.out.println(
+                    "El archivo ya existe en: " + destino.toAbsolutePath());
+            return;
+        }
+
+        enviarTexto(canal, "DESCARGAR");
+        enviarTexto(canal, isbn);
+
+        String estado = recibirTexto(canal);
+
+        if ("DESCARGA_DENEGADA".equals(estado)
+                || "DESCARGA_ERROR".equals(estado)) {
+
+            System.out.println(recibirTexto(canal));
+            return;
+        }
+
+        if (!"DESCARGA_OK".equals(estado)) {
+            throw new IOException("Respuesta de descarga no reconocida.");
+        }
+
+        int longitud;
+
+        try {
+            longitud = Integer.parseInt(recibirTexto(canal));
+        } catch (NumberFormatException e) {
+            throw new IOException("Longitud de descarga inválida.", e);
+        }
+
+        // El hexadecimal ocupa aproximadamente el doble del original.
+        // Este límite cubre el formato actual y evita reservas descontroladas.
+        if (longitud <= 0 || longitud > 3 * 1024 * 1024) {
+            throw new IOException("El tamaño de descarga no está permitido.");
+        }
+
+        String hashEsperado = recibirTexto(canal);
+
+        if (!hashEsperado.matches("[0-9a-f]{64}")) {
+            throw new IOException("El hash recibido tiene un formato inválido.");
+        }
+
+        byte[] archivo = new byte[longitud];
+        int recibidos = 0;
+
+        while (recibidos < longitud) {
+            byte[] parte = canal.recibir();
+
+            if (parte.length == 0
+                    || parte.length > 32 * 1024
+                    || parte.length > longitud - recibidos) {
+
+                throw new IOException("Parte de descarga inválida.");
+            }
+
+            System.arraycopy(
+                    parte, 0, archivo, recibidos, parte.length);
+
+            recibidos += parte.length;
+        }
+
+        String hashRecibido = Sha256.aHexadecimal(
+                Sha256.calcular(archivo));
+
+        if (!hashEsperado.equals(hashRecibido)) {
+            throw new IOException(
+                    "La descarga no coincide con el archivo enviado.");
+        }
+
+        // Guardamos primero en un archivo temporal.
+        Path temporal = Files.createTempFile(carpeta, "libro-", ".part");
+
+        try {
+            Files.write(temporal, archivo);
+
+            // Comprobamos también los bytes que quedaron escritos en disco.
+            byte[] guardado = Files.readAllBytes(temporal);
+
+            if (guardado.length != archivo.length) {
+                throw new IOException("El archivo guardado está incompleto.");
+            }
+
+            for (int i = 0; i < archivo.length; i++) {
+                if (guardado[i] != archivo[i]) {
+                    throw new IOException(
+                            "El archivo guardado difiere en el byte " + i + ".");
+                }
+            }
+
+            // Sin REPLACE_EXISTING: no sobrescribimos otro archivo.
+            Files.move(temporal, destino);
+
+        } finally {
+            // Retiramos el temporal si la escritura o el movimiento fallaron.
+            Files.deleteIfExists(temporal);
+        }
+
+        System.out.println("Descarga verificada correctamente.");
+        System.out.println("Bytes recibidos: " + archivo.length);
+        System.out.println("Archivo: " + destino.toAbsolutePath());
     }
 }

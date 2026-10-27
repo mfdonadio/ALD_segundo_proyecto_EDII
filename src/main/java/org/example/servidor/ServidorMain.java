@@ -9,6 +9,8 @@ import java.nio.file.Path;
 import org.example.persistencia.RepositorioUsuarios;
 import org.example.servicio.ServicioAutenticacion;
 import org.example.persistencia.RepositorioLibros;
+import org.example.seguridad.ClavesLibros;
+import org.example.servicio.ServicioLibros;
 
 public class ServidorMain {
 
@@ -61,6 +63,25 @@ public class ServidorMain {
             return;
         }
 
+        // Cargamos las claves existentes y preparamos el servicio de lectura.
+        final ServicioLibros servicioLibros;
+
+        try {
+            ClavesLibros clavesLibros = ClavesLibros.cargar(
+                    Path.of("datos", "claves", "libros.key"));
+
+            servicioLibros = new ServicioLibros(
+                    catalogo,
+                    clavesLibros,
+                    Path.of("datos", "libros"));
+
+        } catch (IOException e) {
+            System.err.println(
+                    "No se pudieron cargar las claves de libros: " + e.getMessage());
+            return;
+        }
+
+
         //Abrimos el puerto indicado en el archivo
         try(ServerSocket servidor = new ServerSocket(configuracion.getPuerto())){
             System.out.println("Servidor escuchando en el puerto: " + servidor.getLocalPort());
@@ -76,7 +97,9 @@ public class ServidorMain {
                 ManejadorCliente manejador = new ManejadorCliente(
                         cliente,
                         configuracion.getTiempoEsperaLecturaMs(),
-                        autenticacion, catalogo);
+                        autenticacion,
+                        catalogo,
+                        servicioLibros);
 
                 //Atendemos al cliente, pero tambien seguimos acpetando conexiones.
                 Thread hilo = new Thread(manejador);
