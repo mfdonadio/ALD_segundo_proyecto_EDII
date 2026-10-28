@@ -1,0 +1,2 @@
+marco@ejemplo.com | pbkdf2-sha256$600000$daa2c279ee1aea4c5756b3b7a4db119c$a2c9742329312410e6ced53ae30c02995a535841a52a1d443bfb472767b1feeb | true
+edwin@ejemplo.com | pbkdf2-sha256$600000$531d2c8dbfb9142ca17cdc8f47f9c4f7$2fb48e4932a2449c9f87249fdede1ec591fc43a94fe20d6eab13bc5ed81a6932 | false

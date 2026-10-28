@@ -115,10 +115,17 @@ public class ManejadorCliente implements Runnable {
                     atenderSesion(canal);
                 }
 
-            } else {
+            } 
+            else if ("REGISTRO".equals(comando)) {
+                // Crear cuenta no requiere sesión: la conexión termina después.
+                atenderRegistro(canal);
+
+            }
+            else {
                 // Rechaza los comandos que todavía no reconoce.
                 enviarTexto(canal, "ERROR_COMANDO");
             }
+            
 
         } catch (IOException e) {
             // El socket se cierra automáticamente al salir del try.
@@ -189,6 +196,120 @@ public class ManejadorCliente implements Runnable {
                 "Inicio de sesión correcto desde: "
                         + cliente.getRemoteSocketAddress());
     }
+        // Crea una cuenta nueva. Orden de los campos: nombre, apellido,
+    // correo y contraseña. La cuenta nueva siempre es NORMAL (no premium).
+    private void atenderRegistro(CanalCifrado canal) throws IOException {
+
+        String nombre = recibirTexto(canal);
+        String apellido = recibirTexto(canal);
+        String correo = recibirTexto(canal);
+        String contrasena = recibirTexto(canal);
+
+        String error;
+
+        try {
+            error = autenticacion.registrar(
+                    nombre, apellido, correo, contrasena);
+
+        } catch (IOException e) {
+            // No mostramos rutas ni detalles internos al cliente.
+            System.err.println("No se pudo guardar la cuenta nueva: "
+                    + e.getMessage());
+
+            enviarTexto(canal, "ERROR_SERVIDOR");
+            enviarTexto(canal,
+                    "No se pudo crear la cuenta. Intenta más tarde.");
+            return;
+        }
+
+        if (error != null) {
+            enviarTexto(canal, "ERROR_CAMPO");
+            enviarTexto(canal, error);
+            return;
+        }
+
+        enviarTexto(canal, "REGISTRO_OK");
+
+        System.out.println(
+                "Cuenta nueva creada desde: "
+                        + cliente.getRemoteSocketAddress());
+    }
+
+    // Cambia nombre y apellido del usuario de esta sesión.
+    private void atenderActualizarPerfil(CanalCifrado canal)
+            throws IOException {
+
+        if (usuarioAutenticado == null) {
+            throw new IOException("No existe una sesión autenticada.");
+        }
+
+        String nombre = recibirTexto(canal);
+        String apellido = recibirTexto(canal);
+
+        try {
+            usuarioAutenticado = autenticacion.actualizarPerfil(
+                    usuarioAutenticado, nombre, apellido);
+
+        } catch (IllegalArgumentException e) {
+            enviarTexto(canal, "ERROR_CAMPO");
+            enviarTexto(canal, e.getMessage());
+            return;
+
+        } catch (IOException e) {
+            System.err.println("No se pudo guardar el perfil: "
+                    + e.getMessage());
+
+            enviarTexto(canal, "ERROR_SERVIDOR");
+            enviarTexto(canal,
+                    "No se pudieron guardar los cambios. Intenta más tarde.");
+            return;
+        }
+
+        enviarTexto(canal, "ACTUALIZAR_OK");
+        enviarTexto(canal, usuarioAutenticado.getNombre());
+        enviarTexto(canal, usuarioAutenticado.getApellido());
+    }
+
+    // Cambia la contraseña del usuario de esta sesión.
+    private void atenderCambioContrasena(CanalCifrado canal)
+            throws IOException {
+
+        if (usuarioAutenticado == null) {
+            throw new IOException("No existe una sesión autenticada.");
+        }
+
+        String actual = recibirTexto(canal);
+        String nueva = recibirTexto(canal);
+
+        try {
+            Usuario actualizado = autenticacion.cambiarContrasena(
+                    usuarioAutenticado, actual, nueva);
+
+            if (actualizado == null) {
+                enviarTexto(canal, "ERROR_CREDENCIALES");
+                enviarTexto(canal, "La contraseña actual es incorrecta.");
+                return;
+            }
+
+            usuarioAutenticado = actualizado;
+
+        } catch (IllegalArgumentException e) {
+            enviarTexto(canal, "ERROR_CAMPO");
+            enviarTexto(canal, e.getMessage());
+            return;
+
+        } catch (IOException e) {
+            System.err.println("No se pudo guardar la contraseña: "
+                    + e.getMessage());
+
+            enviarTexto(canal, "ERROR_SERVIDOR");
+            enviarTexto(canal,
+                    "No se pudieron guardar los cambios. Intenta más tarde.");
+            return;
+        }
+
+        enviarTexto(canal, "CONTRASENA_OK");
+    }
 
     private static String recibirTexto(CanalCifrado canal) throws IOException {
         // Convertimos a texto después de verificar y descifrar el mensaje.
@@ -250,6 +371,10 @@ public class ManejadorCliente implements Runnable {
                     case "LEER" -> enviarLectura(canal);
 
                     case "DESCARGAR" -> enviarDescarga(canal);
+                    
+                    case "ACTUALIZAR_PERFIL" -> atenderActualizarPerfil(canal);
+
+                    case "CAMBIAR_CONTRASENA" -> atenderCambioContrasena(canal);
 
                     case "LOGOUT" -> {
                         // Eliminamos la sesión antes de confirmar su cierre.

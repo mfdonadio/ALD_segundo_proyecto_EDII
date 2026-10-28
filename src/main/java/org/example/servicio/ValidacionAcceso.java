@@ -64,4 +64,48 @@ public final class ValidacionAcceso {
         // Conservamos los espacios porque pueden formar parte de la contraseña.
         return null;
     }
+        // Longitud mínima exigida al crear o cambiar una contraseña.
+    private static final int MINIMO_CONTRASENA_NUEVA = 8;
+
+    // Las cuentas nuevas piden una contraseña con un mínimo de seguridad.
+    // El inicio de sesión no usa esta regla para no bloquear cuentas viejas.
+    public static String validarContrasenaNueva(String contrasena) {
+        String error = validarContrasena(contrasena);
+
+        if (error != null) {
+            return error;
+        }
+
+        if (contrasena.length() < MINIMO_CONTRASENA_NUEVA) {
+            return "La contraseña nueva debe tener al menos "
+                    + MINIMO_CONTRASENA_NUEVA + " caracteres.";
+        }
+
+        return null;
+    }
+
+    // Valida un nombre o apellido que se guardará en perfiles.txt.
+    // Rechazamos '|' porque es el separador de campos del archivo.
+    public static String validarNombre(String texto, String etiqueta) {
+        if (texto == null || texto.isBlank()) {
+            return "Ingresa tu " + etiqueta + ".";
+        }
+
+        String limpio = texto.trim();
+
+        if (limpio.length() > 60) {
+            return "El " + etiqueta + " no puede superar los 60 caracteres.";
+        }
+
+        for (int i = 0; i < limpio.length(); i++) {
+            char caracter = limpio.charAt(i);
+
+            if (caracter == '|' || Character.isISOControl(caracter)) {
+                return "El " + etiqueta
+                        + " no puede contener '|' ni caracteres de control.";
+            }
+        }
+
+        return null;
+    }
 }

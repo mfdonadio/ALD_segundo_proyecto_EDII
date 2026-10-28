@@ -5,6 +5,8 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.StandardCopyOption;
 
 import org.example.modelo.Usuario;
 import org.example.seguridad.Credenciales;
@@ -17,13 +19,16 @@ public class RepositorioUsuarios {
 
     // Cantidad de posiciones ocupadas.
     private int cantidad;
+        // Archivos de donde se cargaron los datos y donde se vuelven a guardar.
+    private Path rutaUsuarios;
+    private Path rutaPerfiles;
 
     public RepositorioUsuarios() {
         usuarios = new Usuario[10];
         cantidad = 0;
     }
 
-    public Usuario buscarPorCorreo(String correoElectronico) {
+    public synchronized Usuario buscarPorCorreo(String correoElectronico) {
 
         // Rechaza una búsqueda sin correo.
         if (correoElectronico == null || correoElectronico.isBlank()) {
@@ -77,8 +82,152 @@ public class RepositorioUsuarios {
         cantidad++;
     }
 
-    public int getCantidad() {
+    public synchronized int getCantidad() {
         return cantidad;
+    }
+        // ===== Escritura de cuentas =====
+
+    // Crea una cuenta nueva (siempre no premium) y la guarda en disco.
+    public synchronized Usuario crear(
+            String nombre,
+            String apellido,
+            String correo,
+            String hashContrasena) throws IOException {
+
+        Usuario nuevo = new Usuario(
+                nombre, apellido, correo, hashContrasena, false);
+
+        // agregar() rechaza correos repetidos.
+        agregar(nuevo);
+
+        try {
+            guardar();
+        } catch (IOException e) {
+            // Si no se pudo escribir, deshacemos el cambio en memoria.
+            cantidad--;
+            usuarios[cantidad] = null;
+            throw e;
+        }
+
+        return nuevo;
+    }
+
+    // Cambia nombre y apellido. El correo y el tipo de cuenta no cambian.
+    public synchronized Usuario actualizarPerfil(
+            String correo,
+            String nombre,
+            String apellido) throws IOException {
+
+        int posicion = posicionDe(correo);
+        Usuario anterior = usuarios[posicion];
+
+        Usuario actualizado = new Usuario(
+                nombre,
+                apellido,
+                anterior.getCorreoElectronico(),
+                anterior.getHashContrasena(),
+                anterior.isPremium());
+
+        return reemplazar(posicion, anterior, actualizado);
+    }
+
+    // Cambia el hash de la contraseña. Recibe el hash ya calculado.
+    public synchronized Usuario actualizarContrasena(
+            String correo,
+            String nuevoHash) throws IOException {
+
+        int posicion = posicionDe(correo);
+        Usuario anterior = usuarios[posicion];
+
+        Usuario actualizado = new Usuario(
+                anterior.getNombre(),
+                anterior.getApellido(),
+                anterior.getCorreoElectronico(),
+                nuevoHash,
+                anterior.isPremium());
+
+        return reemplazar(posicion, anterior, actualizado);
+    }
+
+    private int posicionDe(String correo) {
+        for (int i = 0; i < cantidad; i++) {
+            if (usuarios[i].getCorreoElectronico()
+                    .equalsIgnoreCase(correo.trim())) {
+                return i;
+            }
+        }
+
+        throw new IllegalArgumentException(
+                "No existe una cuenta con ese correo.");
+    }
+
+    // Sustituye al usuario y guarda; si falla el guardado, restaura el anterior.
+    private Usuario reemplazar(
+            int posicion,
+            Usuario anterior,
+            Usuario actualizado) throws IOException {
+
+        usuarios[posicion] = actualizado;
+
+        try {
+            guardar();
+        } catch (IOException e) {
+            usuarios[posicion] = anterior;
+            throw e;
+        }
+
+        return actualizado;
+    }
+
+    // Reescribe usuarios.txt y perfiles.txt con el contenido actual.
+    private void guardar() throws IOException {
+
+        if (rutaUsuarios == null || rutaPerfiles == null) {
+            throw new IOException(
+                    "El repositorio no se cargó desde archivos.");
+        }
+
+        StringBuilder cuentas = new StringBuilder();
+        StringBuilder perfiles = new StringBuilder();
+
+        for (int i = 0; i < cantidad; i++) {
+            Usuario u = usuarios[i];
+
+            cuentas.append(u.getCorreoElectronico()).append(" | ")
+                    .append(u.getHashContrasena()).append(" | ")
+                    .append(u.isPremium()).append(System.lineSeparator());
+
+            perfiles.append(u.getCorreoElectronico()).append(" | ")
+                    .append(u.getNombre()).append(" | ")
+                    .append(u.getApellido()).append(System.lineSeparator());
+        }
+
+        // Primero las cuentas: un usuario sin perfil solo genera una
+        // advertencia al cargar, pero un perfil sin usuario es un error.
+        escribirReemplazando(rutaUsuarios, cuentas.toString());
+        escribirReemplazando(rutaPerfiles, perfiles.toString());
+    }
+
+    private static void escribirReemplazando(
+            Path destino, String contenido) throws IOException {
+
+        Path carpeta = destino.toAbsolutePath().getParent();
+        Path temporal = Files.createTempFile(carpeta, "usuarios-", ".tmp");
+
+        try {
+            Files.writeString(temporal, contenido, StandardCharsets.UTF_8);
+
+            try {
+                Files.move(temporal, destino,
+                        StandardCopyOption.ATOMIC_MOVE,
+                        StandardCopyOption.REPLACE_EXISTING);
+            } catch (AtomicMoveNotSupportedException e) {
+                Files.move(temporal, destino,
+                        StandardCopyOption.REPLACE_EXISTING);
+            }
+        } finally {
+            Files.deleteIfExists(temporal);
+        }
     }
 
     private static String[] separarCampos(
@@ -202,6 +351,8 @@ public class RepositorioUsuarios {
 
         // Construye el repositorio antes de entregarlo al programa.
         RepositorioUsuarios repositorio = new RepositorioUsuarios();
+        repositorio.rutaUsuarios = rutaUsuarios;
+        repositorio.rutaPerfiles = rutaPerfiles;
 
         try (BufferedReader lector =
                      Files.newBufferedReader(
