@@ -3,19 +3,20 @@ package org.example.servidor;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.net.Socket;
-import org.example.seguridad.IntercambioClaves;
 import java.math.BigInteger;
+import java.net.Socket;
+import java.nio.charset.StandardCharsets;
+
+import org.example.modelo.Libro;
+import org.example.modelo.Usuario;
+import org.example.persistencia.RepositorioLibros;
 import org.example.seguridad.CanalCifrado;
 import org.example.seguridad.ClavesSesion;
-import java.nio.charset.StandardCharsets;
-import org.example.servicio.ServicioAutenticacion;
-import org.example.modelo.Usuario;
-import org.example.servicio.ValidacionAcceso;
-import org.example.modelo.Libro;
-import org.example.persistencia.RepositorioLibros;
-import org.example.servicio.ServicioLibros;
+import org.example.seguridad.IntercambioClaves;
 import org.example.seguridad.Sha256;
+import org.example.servicio.ServicioAutenticacion;
+import org.example.servicio.ServicioLibros;
+import org.example.servicio.ValidacionAcceso;
 
 
 
@@ -40,9 +41,19 @@ public class ManejadorCliente implements Runnable {
                             RepositorioLibros catalogo,
                             ServicioLibros servicioLibros){
 
-        if (autenticacion == null || catalogo == null || servicioLibros == null) {
+        if (autenticacion == null) {
             throw new IllegalArgumentException(
                     "El servicio de autenticación es obligatorio.");
+        }
+
+        if (catalogo == null) {
+            throw new IllegalArgumentException(
+                    "El catálogo es obligatorio.");
+        }
+
+        if (servicioLibros == null) {
+            throw new IllegalArgumentException(
+                    "El servicio de libros es obligatorio.");
         }
 
         this.cliente = cliente;

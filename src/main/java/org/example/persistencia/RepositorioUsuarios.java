@@ -1,12 +1,13 @@
 package org.example.persistencia;
 
-import org.example.modelo.Usuario;
-
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+
+import org.example.modelo.Usuario;
+import org.example.seguridad.Credenciales;
 
 // Lee las credenciales y los perfiles, y los relaciona por correo.
 public class RepositorioUsuarios {
@@ -225,6 +226,16 @@ public class RepositorioUsuarios {
                 String hash = campos[1];
 
                 validarCorreo(correo, rutaUsuarios, numeroLinea);
+
+                // Detecta un hash mal formado al cargar, no durante el login.
+                try {
+                    Credenciales.validarFormato(hash);
+                } catch (IllegalArgumentException e) {
+                    throw new IOException(
+                            rutaUsuarios + ": línea " + numeroLinea
+                                    + ": credencial inválida: "
+                                    + e.getMessage());
+                }
 
                 // Evita registrar dos cuentas con el mismo correo.
                 if (repositorio.buscarPorCorreo(correo) != null) {

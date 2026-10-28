@@ -1,12 +1,12 @@
 package org.example.persistencia;
 
-import org.example.modelo.Libro;
-
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+
+import org.example.modelo.Libro;
 
 /*
  * Carga y consulta el catálogo de libros.
@@ -64,6 +64,12 @@ public final class RepositorioLibros {
                 if (isbn.isEmpty() || titulo.isEmpty()) {
                     throw error(ruta, numeroLinea,
                             "el ISBN y el título son obligatorios.");
+                }
+
+                // Misma regla de ISBN que usan el cliente y ServicioLibros.
+                if (!isbn.matches("[0-9Xx-]+")) {
+                    throw error(ruta, numeroLinea,
+                            "el ISBN solo admite números, guiones o X: " + isbn);
                 }
 
                 if (repositorio.buscarPorIsbn(isbn) != null) {

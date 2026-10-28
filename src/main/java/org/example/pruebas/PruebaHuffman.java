@@ -1,15 +1,13 @@
 package org.example.pruebas;
 
-import org.example.compresion.Huffman;
-
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
+
+import org.example.compresion.Huffman;
 
 /*
  * Comprueba la recuperación exacta después de comprimir y descomprimir.
- * Incluye casos especiales y un libro descargado.
+ * Incluye casos especiales y un texto largo generado por la prueba.
  * También verifica el rechazo de archivos con formato inválido.
  */
 public class PruebaHuffman {
@@ -49,12 +47,17 @@ public class PruebaHuffman {
                 "Ceros al final",
                 new byte[]{10, -1, 20, -128, 0, 0, 0});
 
-        // Utilizamos el archivo que ya recuperamos de la descarga.
-        Path rutaLibro = Path.of(
-                "descargas", "9788424136464.descifrado.txt");
+        // Generamos un texto propio parecido a un libro para no depender de descargas.
+        StringBuilder libro = new StringBuilder();
+
+        for (int i = 1; i <= 200; i++) {
+            libro.append("Capítulo ").append(i)
+                    .append(": áéíóú ñ compresión y recuperación.\n");
+        }
 
         comprobarRecuperacion(
-                "Libro descargado", Files.readAllBytes(rutaLibro));
+                "Texto largo generado",
+                libro.toString().getBytes(StandardCharsets.UTF_8));
 
         // Preparamos un archivo válido para modificar copias.
         byte[] valido = Huffman.comprimir(

@@ -4,38 +4,55 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+import org.example.persistencia.RepositorioLibros;
+import org.example.seguridad.ClavesLibros;
+import org.example.servicio.ServicioLibros;
+
 /*
- * Comprueba que la descarga conserva el archivo cifrado
- * y que su descifrado recupera exactamente el original.
+ * Comprueba que el archivo cifrado del servidor se descifra
+ * y recupera exactamente el original versionado.
+ * No depende de descargas previas: usa solo los datos del repositorio.
  */
 public class PruebaDescargaLocal {
 
     public static void main(String[] args) throws IOException {
-        // Cambia este ISBN si descargaste el otro libro.
         String isbn = "9788424136464";
 
-        comprobarIguales(
-                Path.of("datos", "libros", isbn + ".txt"),
-                Path.of("descargas", isbn + ".txt"),
-                "Descarga cifrada idéntica al archivo del servidor");
+        // Reproducimos el descifrado con los datos versionados, sin descargas.
+        RepositorioLibros catalogo = RepositorioLibros.cargar(
+                Path.of("datos", "catalogo.txt"));
+
+        ClavesLibros claves = ClavesLibros.cargar(
+                Path.of("datos", "claves", "libros.key"));
+
+        ServicioLibros servicio = new ServicioLibros(
+                catalogo, claves, Path.of("datos", "libros"));
+
+        byte[] original = Files.readAllBytes(
+                Path.of("datos", "originales", isbn + ".txt"));
+
+        byte[] descifrado = servicio.leerContenido(isbn);
 
         comprobarIguales(
-                Path.of("datos", "originales", isbn + ".txt"),
-                Path.of("descargas", isbn + ".descifrado.txt"),
-                "Descifrado idéntico al original");
+                original, descifrado,
+                "Descifrado idéntico al original versionado");
     }
 
     private static void comprobarIguales(
-            Path esperado,
-            Path recibido,
-            String descripcion) throws IOException {
+            byte[] esperado,
+            byte[] recibido,
+            String descripcion) {
 
-        // Devuelve -1 cuando los archivos tienen exactamente los mismos bytes.
-        long diferencia = Files.mismatch(esperado, recibido);
-
-        if (diferencia != -1) {
+        if (esperado.length != recibido.length) {
             throw new AssertionError(
-                    descripcion + ": diferencia en el byte " + diferencia);
+                    descripcion + ": longitudes diferentes.");
+        }
+
+        for (int i = 0; i < esperado.length; i++) {
+            if (esperado[i] != recibido[i]) {
+                throw new AssertionError(
+                        descripcion + ": diferencia en el byte " + i + ".");
+            }
         }
 
         System.out.println("OK: " + descripcion);

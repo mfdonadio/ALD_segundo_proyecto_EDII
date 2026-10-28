@@ -13,6 +13,13 @@
     <target name="test" description="Ejecuta las pruebas configuradas en el proyecto Ant.">
         <ant dir="netbeans" target="test" inheritAll="true"/>
     </target>
+    <target name="pruebas" depends="compile"
+            description="Ejecuta todas las pruebas Prueba* y falla si alguna falla.">
+        <!-- Corremos desde la raíz para que config/, datos/ y descargas/ resuelvan bien. -->
+        <java classname="org.example.pruebas.EjecutarPruebas"
+              classpath="netbeans/build/classes"
+              dir="${basedir}" fork="true" failonerror="true"/>
+    </target>
     <target name="clean" description="Limpia solamente los productos de Ant.">
         <ant dir="netbeans" target="clean" inheritAll="true"/>
     </target>

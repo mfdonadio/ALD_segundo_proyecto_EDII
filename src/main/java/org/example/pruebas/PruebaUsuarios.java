@@ -1,10 +1,10 @@
 package org.example.pruebas;
 
-import org.example.modelo.Usuario;
-import org.example.persistencia.RepositorioUsuarios;
-
 import java.io.IOException;
 import java.nio.file.Path;
+
+import org.example.modelo.Usuario;
+import org.example.persistencia.RepositorioUsuarios;
 
 public class PruebaUsuarios {
 
@@ -24,8 +24,9 @@ public class PruebaUsuarios {
                     "MARCO@ejemplo.com");
 
             if (usuario == null) {
-                System.out.println("No se encontró al usuario de prueba.");
-                return;
+                // Sin el usuario de prueba no hay nada que verificar: la prueba falla.
+                throw new AssertionError(
+                        "No se encontró al usuario de prueba.");
             }
 
             // Muestra el perfil sin exponer el hash.
@@ -38,6 +39,8 @@ public class PruebaUsuarios {
             // Informa los errores encontrados al cargar los archivos.
             System.err.println(
                     "No se pudieron cargar los usuarios: " + e.getMessage());
+            // Una prueba que no pudo verificar nada debe fallar con código ≠ 0.
+            System.exit(1);
         }
     }
 }

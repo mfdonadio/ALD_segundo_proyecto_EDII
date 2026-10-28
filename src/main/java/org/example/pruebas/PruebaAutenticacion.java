@@ -1,11 +1,11 @@
 package org.example.pruebas;
 
+import java.io.IOException;
+import java.nio.file.Path;
+
 import org.example.modelo.Usuario;
 import org.example.persistencia.RepositorioUsuarios;
 import org.example.servicio.ServicioAutenticacion;
-
-import java.io.IOException;
-import java.nio.file.Path;
 
 public class PruebaAutenticacion {
 
@@ -49,6 +49,8 @@ public class PruebaAutenticacion {
             // Informa errores de archivos o credenciales mal formadas.
             System.err.println(
                     "No se pudo completar la prueba: " + e.getMessage());
+            // Una prueba que no pudo verificar nada debe fallar con código ≠ 0.
+            System.exit(1);
         }
     }
 

@@ -1,7 +1,7 @@
 package org.example.seguridad;
 
-import java.security.SecureRandom;
 import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
 
 public final class Credenciales {
 
@@ -99,12 +99,8 @@ public final class Credenciales {
                 + "$" + Sha256.aHexadecimal(resultado);
     }
 
-    // Verifica que la credencial sea válida.
-    public static boolean verificar(
-            String contrasena,
-            String credencial) {
-
-        byte[] contrasenaBytes = prepararContrasena(contrasena);
+    // Comprueba que la credencial almacenada tenga un formato válido.
+    public static void validarFormato(String credencial) {
 
         // Limita el tamaño antes de procesar el texto almacenado.
         if (credencial == null || credencial.length() > 128) {
@@ -159,6 +155,24 @@ public final class Credenciales {
             throw new IllegalArgumentException(
                     "Longitud de sal o resultado inválida.");
         }
+
+        // Comprueba que la sal y el resultado sean hexadecimal válido.
+        desdeHexadecimal(partes[2]);
+        desdeHexadecimal(partes[3]);
+    }
+
+    // Verifica que la credencial sea válida.
+    public static boolean verificar(
+            String contrasena,
+            String credencial) {
+
+        byte[] contrasenaBytes = prepararContrasena(contrasena);
+
+        // Reutiliza el mismo análisis de formato usado al cargar.
+        validarFormato(credencial);
+
+        String[] partes = credencial.split("\\$", -1);
+        int iteraciones = Integer.parseInt(partes[1]);
 
         // Recupera los bytes almacenados.
         byte[] sal = desdeHexadecimal(partes[2]);

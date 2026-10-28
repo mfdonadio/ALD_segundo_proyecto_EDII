@@ -1,15 +1,15 @@
 package org.example.servidor;
 
-import org.example.configuracion.ConfiguracionServidor;
-
 import java.io.IOException;
 import java.net.ServerSocket; //Nos ayuda a abrir el puerto donde recibimos las conexiones
 import java.net.Socket;
 import java.nio.file.Path;
-import org.example.persistencia.RepositorioUsuarios;
-import org.example.servicio.ServicioAutenticacion;
+
+import org.example.configuracion.ConfiguracionServidor;
 import org.example.persistencia.RepositorioLibros;
+import org.example.persistencia.RepositorioUsuarios;
 import org.example.seguridad.ClavesLibros;
+import org.example.servicio.ServicioAutenticacion;
 import org.example.servicio.ServicioLibros;
 
 public class ServidorMain {
@@ -26,7 +26,9 @@ public class ServidorMain {
 
         } catch (IOException e) {
             System.err.println(
-                    "No se puedo cargar la configuracion: " + e.getMessage());
+                    "No se pudo cargar la configuración: " + e.getMessage());
+            // Terminamos con código de error para que el arranque fallido se note.
+            System.exit(1);
             return;
         }
 
@@ -44,6 +46,8 @@ public class ServidorMain {
             // Si los archivos fallan, no iniciamos un servidor sin cuentas.
             System.err.println(
                     "No se pudieron cargar los usuarios: " + e.getMessage());
+            // Terminamos con código de error para que el arranque fallido se note.
+            System.exit(1);
             return;
         }
 
@@ -60,6 +64,8 @@ public class ServidorMain {
         } catch (IOException e) {
             System.err.println(
                     "No se pudo cargar el catálogo: " + e.getMessage());
+            // Terminamos con código de error para que el arranque fallido se note.
+            System.exit(1);
             return;
         }
 
@@ -78,6 +84,8 @@ public class ServidorMain {
         } catch (IOException e) {
             System.err.println(
                     "No se pudieron cargar las claves de libros: " + e.getMessage());
+            // Terminamos con código de error para que el arranque fallido se note.
+            System.exit(1);
             return;
         }
 
@@ -108,6 +116,8 @@ public class ServidorMain {
         } catch (IOException e) {
             System.err.println(
                     "Error del servidor: " + e.getMessage());
+            // Terminamos con código de error si no se pudo abrir el puerto.
+            System.exit(1);
         }
 
     }
