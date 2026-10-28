@@ -1,10 +1,5 @@
 package org.example.cliente;
 
-import org.example.configuracion.ConfiguracionCliente;
-import org.example.seguridad.CanalCifrado;
-import org.example.seguridad.ClavesSesion;
-import org.example.seguridad.IntercambioClaves;
-import org.example.servicio.ValidacionAcceso;
 import java.io.BufferedReader;
 import java.io.Console;
 import java.io.DataInputStream;
@@ -15,11 +10,17 @@ import java.math.BigInteger;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Path;
-import org.example.seguridad.Sha256;
 import java.nio.file.Files;
-import org.example.servicio.ServicioLibros;
+import java.nio.file.Path;
+
 import org.example.compresion.Huffman;
+import org.example.configuracion.ConfiguracionCliente;
+import org.example.seguridad.CanalCifrado;
+import org.example.seguridad.ClavesSesion;
+import org.example.seguridad.IntercambioClaves;
+import org.example.seguridad.Sha256;
+import org.example.servicio.ServicioLibros;
+import org.example.servicio.ValidacionAcceso;
 
 
 
@@ -35,11 +36,12 @@ public class ClienteMain {
         try {
             while (true) {
                 System.out.println();
-                System.out.println("=== BIBLIOTECA ===");
-                System.out.println("1. Iniciar sesión");
-                System.out.println("2. Leer archivo Huffman local");
-                System.out.println("3. Crear cuenta");
-                System.out.println("0. Salir");
+                imprimirEncabezado("BIBLIOTECA");
+                imprimirOpcion("1", "Iniciar sesión");
+                imprimirOpcion("2", "Leer archivo Huffman local (sin conexión)");
+                imprimirOpcion("3", "Crear cuenta");
+                imprimirOpcion("0", "Salir");
+                imprimirSeparador();
 
                 String opcion = leerLinea(
                         consola, teclado, "Elige una opción: ");
@@ -66,18 +68,19 @@ public class ClienteMain {
                     case "3" -> crearCuenta(consola, teclado);
 
                     case "0" -> {
+                        System.out.println();
                         System.out.println("¡Hasta luego!");
                         return;
                     }
 
-                    default -> System.out.println(
+                    default -> imprimirError(
                             "Opción inválida. Escribe 1, 2, 3 o 0.");
                 }
             }
 
         } catch (IOException e) {
             System.err.println(
-                    "No se pudo leer la entrada de consola: " + e.getMessage());
+                    "[Error] No se pudo leer la entrada de consola: " + e.getMessage());
         }
     }
 
@@ -100,8 +103,11 @@ public class ClienteMain {
             return false;
         }
 
+        System.out.println();
+        imprimirEncabezado("INICIAR SESIÓN");
+
         if (consola == null) {
-            System.out.println(
+            imprimirAviso(
                     "En esta consola la contraseña será visible al escribir.");
         }
 
@@ -126,7 +132,7 @@ public class ClienteMain {
             String errorCorreo = ValidacionAcceso.validarCorreo(candidato);
 
             if (errorCorreo != null) {
-                System.out.println(errorCorreo);
+                imprimirError(errorCorreo);
                 continue;
             }
 
@@ -148,7 +154,7 @@ public class ClienteMain {
                     break;
                 }
 
-                System.out.println(error);
+                imprimirError(error);
             }
 
             // Conservamos el flujo de conexión y menú que ya tenemos.
@@ -162,7 +168,7 @@ public class ClienteMain {
             String repetir = leerLinea(
                     consola,
                     teclado,
-                    "¿Quieres volver al inicio de sesión? (s/n): ");
+                    "¿Reintentar el inicio de sesión? (s = sí, n = volver al menú): ");
 
             if (repetir == null) {
                 return true;
@@ -231,18 +237,18 @@ public class ClienteMain {
                 }
 
                 System.out.println();
-                System.out.println(
-                        "¡Bienvenido, " + nombre + " " + apellido + "!");
-                System.out.println("Cuenta: " + tipoCuenta);
+                imprimirOk("Sesión iniciada. ¡Bienvenido, "
+                        + nombre + " " + apellido + "!");
 
-                return atenderMenu(canal, consola, teclado);
+                return atenderMenu(
+                        canal, consola, teclado, nombre, apellido, tipoCuenta);
             }
 
             if ("ERROR_CAMPO".equals(estado)
                     || "ERROR_CREDENCIALES".equals(estado)
                     || "ERROR_SERVIDOR".equals(estado)) {
 
-                System.out.println(recibirTexto(canal));
+                imprimirError(recibirTexto(canal));
                 return false;
             }
 
@@ -250,7 +256,7 @@ public class ClienteMain {
 
         } catch (IOException e) {
             System.err.println(
-                    "Error de comunicación con el servidor: " + e.getMessage());
+                    "[Error] Error de comunicación con el servidor: " + e.getMessage());
             return false;
         }
     }
@@ -269,13 +275,13 @@ public class ClienteMain {
             configuracion = ConfiguracionCliente.cargar(
                     Path.of("config", "cliente.txt"));
         } catch (IOException e) {
-            System.out.println(
+            imprimirError(
                     "No se pudo cargar la configuración: " + e.getMessage());
             return;
         }
 
         System.out.println();
-        System.out.println("=== Crear cuenta ===");
+        imprimirEncabezado("CREAR CUENTA");
 
         String nombre = pedirNombre(consola, teclado, "Nombre: ", "nombre");
         if (nombre == null) {
@@ -304,7 +310,7 @@ public class ClienteMain {
                 break;
             }
 
-            System.out.println(error);
+            imprimirError(error);
         }
 
         String contrasena = pedirContrasenaNueva(consola, teclado, "Contraseña: ");
@@ -321,7 +327,7 @@ public class ClienteMain {
         }
 
         if (!contrasena.equals(repetida)) {
-            System.out.println("Las contraseñas no coinciden. No se creó la cuenta.");
+            imprimirError("Las contraseñas no coinciden. No se creó la cuenta.");
             return;
         }
 
@@ -338,7 +344,7 @@ public class ClienteMain {
 
             if ("REGISTRO_OK".equals(estado)) {
                 System.out.println();
-                System.out.println("Cuenta creada. Ya puedes iniciar sesión con "
+                imprimirOk("Cuenta creada. Ya puedes iniciar sesión con "
                         + correo + ".");
                 return;
             }
@@ -347,7 +353,7 @@ public class ClienteMain {
 
         } catch (IOException e) {
             System.err.println(
-                    "Error de comunicación con el servidor: " + e.getMessage());
+                    "[Error] Error de comunicación con el servidor: " + e.getMessage());
         }
     }
 
@@ -358,7 +364,7 @@ public class ClienteMain {
             BufferedReader teclado) throws IOException {
 
         System.out.println();
-        System.out.println("=== Actualizar mis datos ===");
+        imprimirEncabezado("ACTUALIZAR MIS DATOS");
 
         String nombre = pedirNombre(consola, teclado, "Nombre nuevo: ", "nombre");
         if (nombre == null) {
@@ -381,7 +387,7 @@ public class ClienteMain {
             String nombreGuardado = recibirTexto(canal);
             String apellidoGuardado = recibirTexto(canal);
 
-            System.out.println("Datos actualizados: "
+            imprimirOk("Datos actualizados: "
                     + nombreGuardado + " " + apellidoGuardado);
             return;
         }
@@ -396,7 +402,7 @@ public class ClienteMain {
             BufferedReader teclado) throws IOException {
 
         System.out.println();
-        System.out.println("=== Cambiar contraseña ===");
+        imprimirEncabezado("CAMBIAR CONTRASEÑA");
 
         String actual = leerContrasenaConEtiqueta(
                 consola, teclado, "Contraseña actual: ");
@@ -417,7 +423,7 @@ public class ClienteMain {
         }
 
         if (!nueva.equals(repetida)) {
-            System.out.println("Las contraseñas no coinciden. No se hizo ningún cambio.");
+            imprimirError("Las contraseñas no coinciden. No se hizo ningún cambio.");
             return;
         }
 
@@ -428,7 +434,7 @@ public class ClienteMain {
         String estado = recibirTexto(canal);
 
         if ("CONTRASENA_OK".equals(estado)) {
-            System.out.println("Contraseña actualizada.");
+            imprimirOk("Contraseña actualizada.");
             return;
         }
 
@@ -443,7 +449,7 @@ public class ClienteMain {
                 || "ERROR_CREDENCIALES".equals(estado)
                 || "ERROR_SERVIDOR".equals(estado)) {
 
-            System.out.println(recibirTexto(canal));
+            imprimirError(recibirTexto(canal));
             return;
         }
 
@@ -470,7 +476,7 @@ public class ClienteMain {
                 return escrito.trim();
             }
 
-            System.out.println(error);
+            imprimirError(error);
         }
     }
 
@@ -494,7 +500,7 @@ public class ClienteMain {
                 return escrita;
             }
 
-            System.out.println(error);
+            imprimirError(error);
         }
     }
 
@@ -604,6 +610,71 @@ public class ClienteMain {
         return new String(canal.recibir(), StandardCharsets.UTF_8);
     }
 
+    // ===== Ayudantes de formato de consola =====
+
+    // Ancho fijo del diseño propio; el contenido del libro no se ajusta.
+    private static final int ANCHO = 60;
+
+    // Construye una línea repitiendo un carácter la cantidad indicada.
+    private static String repetir(char caracter, int veces) {
+        StringBuilder linea = new StringBuilder();
+
+        for (int i = 0; i < veces; i++) {
+            linea.append(caracter);
+        }
+
+        return linea.toString();
+    }
+
+    // Imprime un encabezado de pantalla con el título centrado entre líneas de '='.
+    private static void imprimirEncabezado(String titulo) {
+        String borde = repetir('=', ANCHO);
+
+        int relleno = (ANCHO - titulo.length()) / 2;
+
+        if (relleno < 0) {
+            relleno = 0;
+        }
+
+        System.out.println(borde);
+        System.out.println(repetir(' ', relleno) + titulo);
+        System.out.println(borde);
+    }
+
+    // Imprime un subtítulo de sección entre líneas de '-'.
+    private static void imprimirSubtitulo(String titulo) {
+        String borde = repetir('-', ANCHO);
+
+        System.out.println(borde);
+        System.out.println("  " + titulo);
+        System.out.println(borde);
+    }
+
+    // Imprime una línea separadora de '-'.
+    private static void imprimirSeparador() {
+        System.out.println(repetir('-', ANCHO));
+    }
+
+    // Imprime una opción de menú con sangría uniforme.
+    private static void imprimirOpcion(String numero, String texto) {
+        System.out.println("  " + numero + ". " + texto);
+    }
+
+    // Marca un mensaje de éxito con el prefijo uniforme.
+    private static void imprimirOk(String mensaje) {
+        System.out.println("[OK] " + mensaje);
+    }
+
+    // Marca un mensaje de error con el prefijo uniforme.
+    private static void imprimirError(String mensaje) {
+        System.out.println("[Error] " + mensaje);
+    }
+
+    // Marca un aviso con el prefijo uniforme.
+    private static void imprimirAviso(String mensaje) {
+        System.out.println("[Aviso] " + mensaje);
+    }
+
     private static void mostrarCatalogo(CanalCifrado canal) throws IOException {
         enviarTexto(canal, "CATALOGO");
 
@@ -627,41 +698,56 @@ public class ClienteMain {
         }
 
         System.out.println();
-        System.out.println("=== Catálogo de libros ===");
+        imprimirSubtitulo("CATÁLOGO DE LIBROS");
 
         if (cantidad == 0) {
-            System.out.println("El catálogo está vacío.");
+            imprimirAviso("El catálogo está vacío.");
             return;
         }
+
+        // Encabezado de la tabla con columnas alineadas.
+        System.out.printf("  %2s  %-13s  %s%n", "#", "ISBN", "Título");
+        System.out.println("  " + repetir('-', 2)
+                + "  " + repetir('-', 13)
+                + "  " + repetir('-', 30));
 
         for (int i = 0; i < cantidad; i++) {
             String isbn = recibirTexto(canal);
             String titulo = recibirTexto(canal);
 
-            System.out.println(
-                    (i + 1) + ". " + titulo + " | ISBN: " + isbn);
+            System.out.printf("  %2d  %-13s  %s%n", (i + 1), isbn, titulo);
         }
 
-        System.out.println("Total: " + cantidad + " libros.");
+        imprimirSeparador();
+
+        // Concordancia de singular y plural en el total.
+        String palabra = cantidad == 1 ? "libro" : "libros";
+        System.out.println("  Total: " + cantidad + " " + palabra);
     }
 
     //Menu con las opciones del cliente :)
     private static boolean atenderMenu(
             CanalCifrado canal,
             Console consola,
-            BufferedReader teclado) throws IOException {
+            BufferedReader teclado,
+            String nombre,
+            String apellido,
+            String tipoCuenta) throws IOException {
 
         while (true) {
             System.out.println();
-            System.out.println("=== Biblioteca ===");
-            System.out.println("1. Ver mi perfil");
-            System.out.println("2. Ver catálogo");
-            System.out.println("3. Leer libro");
-            System.out.println("4. Descargar libro cifrado (Premium)");
-            System.out.println("5. Cerrar sesión");
-            System.out.println("6. Actualizar mis datos");
-            System.out.println("7. Cambiar contraseña");
-            System.out.println("0. Salir");
+            // Encabezado con el nombre completo y el tipo de cuenta del usuario.
+            imprimirEncabezado(
+                    nombre + " " + apellido + "  |  Cuenta: " + tipoCuenta);
+            imprimirOpcion("1", "Ver mi perfil");
+            imprimirOpcion("2", "Ver catálogo");
+            imprimirOpcion("3", "Leer libro");
+            imprimirOpcion("4", "Descargar libro cifrado (solo Premium)");
+            imprimirOpcion("5", "Cerrar sesión");
+            imprimirOpcion("6", "Actualizar mis datos");
+            imprimirOpcion("7", "Cambiar contraseña");
+            imprimirOpcion("0", "Salir");
+            imprimirSeparador();
 
             String opcion = leerLinea(consola, teclado, "Elige una opción: ");
 
@@ -682,19 +768,23 @@ public class ClienteMain {
                     }
 
                     // El servidor devuelve el perfil de esta sesión.
-                    String nombre = recibirTexto(canal);
-                    String apellido = recibirTexto(canal);
-                    String correo = recibirTexto(canal);
-                    String cuenta = recibirTexto(canal);
+                    String nombrePerfil = recibirTexto(canal);
+                    String apellidoPerfil = recibirTexto(canal);
+                    String correoPerfil = recibirTexto(canal);
+                    String cuentaPerfil = recibirTexto(canal);
 
-                    if (!"PREMIUM".equals(cuenta) && !"NORMAL".equals(cuenta)) {
+                    if (!"PREMIUM".equals(cuentaPerfil)
+                            && !"NORMAL".equals(cuentaPerfil)) {
                         throw new IOException("Tipo de cuenta no reconocido.");
                     }
 
                     System.out.println();
-                    System.out.println("Nombre: " + nombre + " " + apellido);
-                    System.out.println("Correo: " + correo);
-                    System.out.println("Cuenta: " + cuenta);
+                    imprimirSubtitulo("MI PERFIL");
+                    System.out.println(
+                            "  Nombre : " + nombrePerfil + " " + apellidoPerfil);
+                    System.out.println("  Correo : " + correoPerfil);
+                    System.out.println("  Cuenta : " + cuentaPerfil);
+                    imprimirSeparador();
                 }
 
                 case "2" -> {
@@ -717,7 +807,8 @@ public class ClienteMain {
                                 "No se confirmó el cierre de sesión.");
                     }
 
-                    System.out.println("Sesión cerrada.");
+                    System.out.println();
+                    imprimirOk("Sesión cerrada.");
 
                     // Regresamos al flujo que permite iniciar sesión otra vez.
                     return false;
@@ -731,13 +822,14 @@ public class ClienteMain {
                                 "No se confirmó la salida.");
                     }
 
+                    System.out.println();
                     System.out.println("¡Hasta luego!");
 
                     // Indicamos al main que debe finalizar el programa.
                     return true;
                 }
 
-                default -> System.out.println(
+                default -> imprimirError(
                         "Opción inválida. Escribe 1, 2, 3, 4, 5, 6, 7 o 0.");
             }
         }
@@ -760,7 +852,7 @@ public class ClienteMain {
         isbn = isbn.trim();
 
         if (!isbn.matches("[0-9Xx-]+")) {
-            System.out.println(
+            imprimirError(
                     "El ISBN solo puede contener números, guiones o X.");
             return;
         }
@@ -771,7 +863,7 @@ public class ClienteMain {
         String estado = recibirTexto(canal);
 
         if ("LECTURA_ERROR".equals(estado)) {
-            System.out.println(recibirTexto(canal));
+            imprimirError(recibirTexto(canal));
             return;
         }
 
@@ -816,10 +908,10 @@ public class ClienteMain {
         String texto = new String(contenido, StandardCharsets.UTF_8);
 
         System.out.println();
-        System.out.println("=== LECTURA DEL LIBRO DESDE TERMINAL ===\n");
+        imprimirEncabezado("LECTURA DEL LIBRO");
         System.out.print(texto);
         System.out.println();
-        System.out.println("\n=== FIN DEL LIBRO ===");
+        imprimirEncabezado("FIN DEL LIBRO");
     }
 
     //Descargar el libro seleccionado, para usuarios premium.
@@ -839,7 +931,7 @@ public class ClienteMain {
 
         //Usamos una regex para validar el formato del ISBN de nuestros libros.
         if (!isbn.matches("[0-9Xx-]+")) {
-            System.out.println(
+            imprimirError(
                     "El ISBN solo puede contener números, guiones o X.");
             return;
         }
@@ -858,7 +950,7 @@ public class ClienteMain {
         if ("DESCARGA_DENEGADA".equals(estado)
                 || "DESCARGA_ERROR".equals(estado)) {
 
-            System.out.println(recibirTexto(canal));
+            imprimirError(recibirTexto(canal));
             return;
         }
 
@@ -929,7 +1021,7 @@ public class ClienteMain {
             // Guardamos el cifrado o verificamos que el existente sea idéntico.
             guardarArchivoVerificado(destino, archivo);
 
-            System.out.println("Descarga cifrada verificada: "
+            imprimirOk("Descarga cifrada verificada: "
                     + destino.toAbsolutePath());
 
             // Desciframos sin modificar el archivo cifrado que acabamos de guardar.
@@ -959,15 +1051,15 @@ public class ClienteMain {
             // Guardamos los bytes comprimidos o verificamos el archivo existente.
             guardarArchivoVerificado(destinoHuffman, comprimido);
 
-            System.out.println("Libro comprimido y verificado correctamente.");
-            System.out.println("Original: " + original.length + " bytes.");
-            System.out.println("Huffman: " + comprimido.length + " bytes.");
+            imprimirOk("Libro comprimido y verificado correctamente.");
+            System.out.println("     Original : " + original.length + " bytes");
+            System.out.println("     Huffman  : " + comprimido.length + " bytes");
             System.out.println(
-                    "Archivo guardado en: " + destinoHuffman.toAbsolutePath());
+                    "     Guardado : " + destinoHuffman.toAbsolutePath());
 
         } catch (IOException e) {
             // Volvemos al menú sin confundir un fallo local con uno de conexión.
-            System.out.println(
+            imprimirError(
                     "No se pudo completar el procesamiento local del libro: "
                             + e.getMessage());
         }
@@ -1015,7 +1107,7 @@ public class ClienteMain {
             }
 
             if (comprimido.length > maximoArchivo) {
-                System.out.println(
+                imprimirError(
                         "El archivo supera el tamaño admitido.");
                 return;
             }
@@ -1027,14 +1119,14 @@ public class ClienteMain {
             String texto = new String(original, StandardCharsets.UTF_8);
 
             System.out.println();
-            System.out.println("=== LECTURA DEL ARCHIVO HUFFMAN ===");
+            imprimirEncabezado("LECTURA DEL ARCHIVO HUFFMAN");
             System.out.print(texto);
             System.out.println();
-            System.out.println("=== FIN DEL LIBRO ===");
+            imprimirEncabezado("FIN DEL LIBRO");
 
         } catch (IOException | IllegalArgumentException e) {
             // El error se atiende aquí para conservar el funcionamiento del menú.
-            System.out.println(
+            imprimirError(
                     "No se pudo abrir el archivo Huffman: " + e.getMessage());
         }
     }
@@ -1050,7 +1142,7 @@ public class ClienteMain {
         if (Files.exists(destino)) {
             comprobarArchivo(destino, datos);
 
-            System.out.println(
+            imprimirOk(
                     "Archivo existente verificado: " + destino.toAbsolutePath());
             return;
         }
